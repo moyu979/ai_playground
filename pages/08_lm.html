@@ -35,6 +35,8 @@
   footer{padding:10px 26px 34px;color:var(--muted);font-size:13px;max-width:1100px}
   footer a{color:var(--blue)}
 </style>
+<script>window.MathJax = { tex: { inlineMath: [["$", "$"], ["\\(", "\\)"]], displayMath: [["$$", "$$"], ["\\[", "\\]"]] }, svg: { fontCache: "global" }, options: { skipHtmlTags: ["script", "noscript", "style", "textarea", "pre", "code"] } };</script>
+<script defer src="../assets/mathjax/tex-svg.js"></script>
 </head>
 <body>
 <header>
@@ -79,6 +81,113 @@
      你选中的行会高亮。第一行 '.' 就是"名字怎么开头"的分布。</p>
 </div>
 
+<!--BOOK-START-->
+<div class="card" id="book">
+  <style>
+  .book{font-size:14px;line-height:1.85}
+  .book h2{font-size:16.5px;margin:26px 0 8px;padding-top:10px;border-top:1px dashed var(--line)}
+  .book h3{font-size:14.5px;margin:18px 0 6px}
+  .book p{margin:9px 0}
+  .book code{background:#eef1f6;border-radius:5px;padding:1px 6px;font-size:12.5px}
+  .book pre{background:#0d1220;color:#d8e0f0;border-radius:10px;padding:13px 16px;overflow:auto;
+            font-family:ui-monospace,Menlo,monospace;font-size:12.5px;line-height:1.7}
+  .book pre code{background:none;padding:0;color:inherit}
+  .book table{border-collapse:collapse;font-size:13px;width:100%;margin:10px 0}
+  .book td,.book th{border:1px solid var(--line);padding:6px 10px;text-align:left}
+  .book th{background:#f4f7fc}
+  .book ul,.book ol{line-height:1.8;padding-left:22px}
+  .book blockquote{border-left:4px solid var(--orange);background:#fff8ef;margin:10px 0;
+                   padding:8px 14px;border-radius:0 8px 8px 0}
+  .book a{color:var(--blue)}
+  .book mjx-container{overflow-x:auto;overflow-y:hidden;max-width:100%}
+  .gen{font-size:11.5px;color:var(--muted);font-weight:400;margin-left:8px}
+  </style>
+
+<h2>📖 教材全文<span class="gen">由 08_sequence_models/README.md 自动生成 — 修改后运行 <code>python tools/build_book.py</code> 重新编译</span></h2>
+<div class="book">
+<h1 id="08-bigram-mlp-rnn">第 08 课 · 语言模型 — bigram → MLP → RNN</h1>
+<blockquote>
+<p>🌐 配套互动网页：<a href="../pages/08_lm.html">08_lm.html</a>（讲解精华 + 可玩 demo，无需任何安装）</p>
+<p>从这一课起，我们切换到 <strong>生成模型</strong>：不再"图片→标签"，而是
+"前文 → 下一个字符的概率分布"。这是 GPT 的核心任务，只是它做得更深更大。
+本课终点你会得到一个会写"伪莎士比亚"的字符级 RNN——并看清它的三个致命伤，
+它们正是第 9 课注意力机制要解决的问题。</p>
+</blockquote>
+<h2 id="1-token">1. 语言建模：下一个 token</h3>
+<p>一段文本 <span class="arithmatex">\(x_{1:T} = (x_1, x_2, \dots, x_T)\)</span> 的概率用链式法则分解：</p>
+<div class="arithmatex">\[p(x_{1:T}) = \prod_{t=1}^{T} p(x_t \mid x_{&lt;t})\]</div>
+<p><strong>语言模型 = 学会条件分布 <span class="arithmatex">\(p(x_t \mid x_{&lt;t})\)</span>。</strong> 生成时从左往右采样，一次一个。</p>
+<blockquote>
+<p><strong>字符级还是词级？</strong> 词级词表大（5 万+）且遇到没见过的词就懵（OOV）；
+字符级词表小（本文语料 65 个字符）且永不 OOV，但序列长。
+教学选字符级；工业界用 BPE 子词（karpathy 有专门一讲：<em>Let's build the GPT Tokenizer</em>）。</p>
+</blockquote>
+<p><strong>评估指标</strong>：训练目标是最小化平均负对数似然（就是第 3 课的交叉熵！）：</p>
+<div class="arithmatex">\[L = -\frac{1}{T}\sum_t \log p(x_t \mid x_{&lt;t}), \qquad \text{困惑度} = e^{L}\]</div>
+<p>困惑度的物理直觉：模型每一步在"多宽"的有效分布里犹豫。均匀 65 选 1 → 困惑度 65；
+完美的下一个字符 → 困惑度 1。</p>
+<h2 id="2-bigram">2. bigram：数数就能建模型</h3>
+<p>只看前 1 个字符：<span class="arithmatex">\(p(x_t|x_{t-1}) = \dfrac{N(x_{t-1}, x_t)}{N(x_{t-1})}\)</span>，
+全部信息装进一张 <span class="arithmatex">\(V\times V\)</span> 计数矩阵。</p>
+<ul>
+<li>好处：不用训练、一眼看穿（代码画了热图：<code>e</code> 后面常跟什么？）</li>
+<li>坏处：上下文只有 1 个字符 —— 模型连 <code>th</code> 后该是元音都"不知道"，只知道单步统计</li>
+<li>训练集困惑度 ≈ 5~7（names 数据）；任何能利用更长上下文的模型都应碾压它——<strong>这就是基线</strong></li>
+</ul>
+<h2 id="3-bengio-2003embedding">3. 神经网络语言模型（Bengio 2003）：embedding 登场</h3>
+<p>上下文取前 <span class="arithmatex">\(n\)</span> 个字符，架构：</p>
+<pre><code>(context 字符索引) → 查表 C[V, d] 得 d 维向量 ×n → 拼接 → MLP → softmax(V)
+</code></pre>
+<p>关键新概念 <strong>embedding（嵌入）</strong>：把离散符号映射成可学习的低维向量。
+"字符 'a' 是什么"不再由它在词表里的序号决定，而由它在 <span class="arithmatex">\(d\)</span> 维空间中的<strong>位置</strong>决定——
+用法相近的字符会自动靠拢（代码画了 2D 嵌入散点：注意元音们抱团的现象）。</p>
+<p>这解决了 bigram 的"上下文长度=1"，但拼接定长窗口仍是<strong>扁平</strong>的：
+换个上下文长度就得换网络。</p>
+<h2 id="4-rnn">4. RNN：把"读过的"压缩进一个状态</h3>
+<p>循环神经网络用同一个单元递归地处理序列：</p>
+<div class="arithmatex">\[h_t = \tanh(W_{xh}\, x_t + W_{hh}\, h_{t-1} + b), \qquad \text{logits}_t = W_{hy} h_t\]</div>
+<ul>
+<li><span class="arithmatex">\(h_t \in \mathbb R^{d_h}\)</span> 是<strong>隐状态</strong>：整段历史的有损压缩（像系统状态变量）</li>
+<li>同一组权重用 <span class="arithmatex">\(T\)</span> 次 → 天然处理任意长度、参数量与序列长度无关</li>
+<li>训练用 <strong>BPTT</strong>（沿时间反传）：把 RNN 展开成深度为 <span class="arithmatex">\(T\)</span> 的网络，autograd 自动搞定</li>
+</ul>
+<blockquote>
+<p><strong>梯度消失的物理本质</strong>：反传经过时间维度要连乘雅可比
+<span class="arithmatex">\(\dfrac{\partial h_t}{\partial h_{t-1}} = D\,\odot\, W_{hh}^T\)</span>（<span class="arithmatex">\(D\)</span> 是 tanh 导数的对角阵）。
+乘性动力学的行为由谱半径决定——和迭代映射的 <strong>Lyapunov 指数</strong>同一套数学：
+<span class="arithmatex">\(\|W_{hh}\|\)</span> 略小于 1 → 信号/梯度指数衰减（第 1 步的教训传不到第 50 步）；
+略大于 1 → 爆炸（训练用梯度裁剪急救）。<strong>代码用 hook 实测了 <span class="arithmatex">\(\|\partial L/\partial h_t\|\)</span> 随 <span class="arithmatex">\(t\)</span> 的衰减曲线。</strong></p>
+</blockquote>
+<p><strong>LSTM/GRU</strong>（1997/2014）：给状态加"门控"——一个[0,1]的乘性阀门
+<span class="arithmatex">\(c_t = f_t \odot c_{t-1} + i_t \odot \tilde c_t\)</span>，让信息可以<strong>近似恒等</strong>地流过时间
+（加法路径 vs 乘法路径）。理解思想即可，用 <code>nn.LSTM</code>。</p>
+<blockquote>
+<p>埋个伏笔：这种"加法高速公路"在 ResNet 残差连接里会再次登场（第 10 课 Block）。</p>
+</blockquote>
+<h2 id="5-rnn-9">5. RNN 的三个根本痛点（第 9 课的引子）</h3>
+<ol>
+<li><strong>顺序计算</strong>：<span class="arithmatex">\(t\)</span> 步必须等 <span class="arithmatex">\(t-1\)</span> 步，无法并行 —— GPU 大部分算力在围观</li>
+<li><strong>长程依赖衰减</strong>：即使 LSTM，信息也要一步步"搬运"，距离 <span class="arithmatex">\(O(T)\)</span></li>
+<li><strong>信息瓶颈</strong>：任意长的历史压缩进固定维的 <span class="arithmatex">\(h\)</span>，是个有损单通道</li>
+</ol>
+<p>解法预告：让每个位置<strong>直接</strong>访问所有历史位置——按"相关性"加权取用。
+这就是注意力。</p>
+<h2 id="_1">运行</h3>
+<pre><code class="language-bash">python bigram.py       # 计数矩阵热图 + 采样名字/文本 + 困惑度
+python mlp_lm.py       # Bengio 模型学英文名, 2D embedding 散点 (看元音抱团)
+python rnn_char.py     # 字符级 RNN 训练 + 采样伪莎士比亚 + 梯度消失实测
+python exercises.py
+</code></pre>
+<p>数据：<code>../data/names.txt</code>（32032 个名字）与 <code>../data/shakespeare.txt</code>（课程开始时已下载）。</p>
+<h2 id="_2">练习</h3>
+<ol>
+<li><strong>trigram</strong>：给 bigram 加一位上下文，对比困惑度（体会"上下文就是一切"）。</li>
+<li><strong>温度采样</strong>：给采样加温度 <span class="arithmatex">\(T\)</span>（softmax 的玻尔兹曼温度），从"刻板"到"疯癫"。</li>
+<li><strong>GRU 对决</strong>：<code>nn.GRU</code> vs 裸 RNN 同配置对比，亲眼看到门控的价值。</li>
+</ol>
+</div>
+</div>
+<!--BOOK-END-->
 <div class="card bridge">
   <h2>🧪 去终端做真练习</h2>
   <p><code>cd 08_sequence_models && python bigram.py</code>（3.2 万名字 + 莎士比亚 bigram），

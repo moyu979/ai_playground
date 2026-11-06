@@ -38,6 +38,8 @@
   footer{padding:10px 26px 34px;color:var(--muted);font-size:13px;max-width:1100px}
   footer a{color:var(--blue)}
 </style>
+<script>window.MathJax = { tex: { inlineMath: [["$", "$"], ["\\(", "\\)"]], displayMath: [["$$", "$$"], ["\\[", "\\]"]] }, svg: { fontCache: "global" }, options: { skipHtmlTags: ["script", "noscript", "style", "textarea", "pre", "code"] } };</script>
+<script defer src="../assets/mathjax/tex-svg.js"></script>
 </head>
 <body>
 <header>
@@ -84,6 +86,240 @@
      🧪 试一试: T=0.1 + k=1 → 贪心复读机; T=2 + k=8 → 醉汉; T=0.8 + k=3 → 教科书推荐配置</p>
 </div>
 
+<!--BOOK-START-->
+<div class="card" id="book">
+  <style>
+  .book{font-size:14px;line-height:1.85}
+  .book h2{font-size:16.5px;margin:26px 0 8px;padding-top:10px;border-top:1px dashed var(--line)}
+  .book h3{font-size:14.5px;margin:18px 0 6px}
+  .book p{margin:9px 0}
+  .book code{background:#eef1f6;border-radius:5px;padding:1px 6px;font-size:12.5px}
+  .book pre{background:#0d1220;color:#d8e0f0;border-radius:10px;padding:13px 16px;overflow:auto;
+            font-family:ui-monospace,Menlo,monospace;font-size:12.5px;line-height:1.7}
+  .book pre code{background:none;padding:0;color:inherit}
+  .book table{border-collapse:collapse;font-size:13px;width:100%;margin:10px 0}
+  .book td,.book th{border:1px solid var(--line);padding:6px 10px;text-align:left}
+  .book th{background:#f4f7fc}
+  .book ul,.book ol{line-height:1.8;padding-left:22px}
+  .book blockquote{border-left:4px solid var(--orange);background:#fff8ef;margin:10px 0;
+                   padding:8px 14px;border-radius:0 8px 8px 0}
+  .book a{color:var(--blue)}
+  .book mjx-container{overflow-x:auto;overflow-y:hidden;max-width:100%}
+  .gen{font-size:11.5px;color:var(--muted);font-weight:400;margin-left:8px}
+  </style>
+
+<h2>📖 教材全文<span class="gen">由 10_transformer/README.md 自动生成 — 修改后运行 <code>python tools/build_book.py</code> 重新编译</span></h2>
+<div class="book">
+<h1 id="10-transformer-gpt">第 10 课 · Transformer — 组装你自己的 GPT</h1>
+<blockquote>
+<p>🌐 配套互动网页：<a href="../pages/10_transformer.html">10_transformer.html</a>（讲解精华 + 可玩 demo，无需任何安装）</p>
+<p>十课旅程的终点，也是现代 AI 的起点。你将亲手写出 nanoGPT 风格的完整模型，
+在莎士比亚语料上训练，然后看着它吐出"伪莎士比亚"。
+这份 <code>model.py</code> 与 GPT-2 的唯一区别是<strong>尺寸</strong>——结构上每一个部件都一样。</p>
+</blockquote>
+<h2 id="1">1. 全家福</h3>
+<pre><code>                        ┌─────────────────────────────────────┐
+ token 索引 (B,T) ──►  tok_emb + pos_emb                    (B,T,d)
+                        │                                     │
+                        │  × N 层 [Block]:                    │
+                        │    x = x + Attn(LN₁(x))   ◄─ 残差   │
+                        │    x = x + MLP(LN₂(x))    ◄─ 残差   │
+                        │                                     │
+                        │  LN → Linear(d→V)                   │
+                        └─────────────────────────────────────┘
+ logits (B,T,V) ──► softmax ──► 交叉熵 (对齐右移一位的目标)
+</code></pre>
+<p>数据流：<code>token → 向量 → N 次"注意力+MLP 精炼" → 对每个位置预测下一个 token 的分布</code>。</p>
+<h2 id="2">2. 各部件与出处的对应</h3>
+<table>
+<thead>
+<tr>
+<th>部件</th>
+<th>出处</th>
+<th>一句话理由</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>因果自注意力</td>
+<td>第 9 课</td>
+<td>每个位置并行读取全部历史</td>
+</tr>
+<tr>
+<td><strong>残差连接</strong> <code>x + F(x)</code></td>
+<td>ResNet (He 2015)</td>
+<td>梯度有"高速公路"直通浅层；第 8 课 LSTM 门控的加法路径是同一思想。<strong>实测</strong>（<code>ablation.py</code>）：拆掉后同预算损失 3.19 vs 完整 2.05</td>
+</tr>
+<tr>
+<td><strong>Pre-LN</strong> <code>x + F(LN(x))</code></td>
+<td>GPT-2 改动</td>
+<td>LayerNorm 放进残差分支内，深层训练稳定（原论文是 post-LN）</td>
+</tr>
+<tr>
+<td>LayerNorm</td>
+<td>—</td>
+<td>把每个 token 的特征向量归一化（减均值除方差+仿射），稳定各层分布</td>
+</tr>
+<tr>
+<td>MLP: d → 4d → d</td>
+<td>Vaswani §3.3</td>
+<td>注意力负责"混合位置间信息"，MLP 负责在每个位置内"思考"，GELU 激活</td>
+</tr>
+<tr>
+<td>learned 位置 embedding</td>
+<td>GPT-2</td>
+<td>注意力对位置天然盲，必须显式注入"第几个 token"（原论文用正弦，GPT 改可学习）</td>
+</tr>
+<tr>
+<td>weight tying</td>
+<td>—</td>
+<td>输出投影与输入 embedding 共享矩阵：省参数，小词表下略提效</td>
+</tr>
+</tbody>
+</table>
+<p><strong>初始化</strong>（<code>model.py</code> 里 <code>_init_weights</code>）：全参数 <span class="arithmatex">\(\mathcal N(0, 0.02)\)</span>，
+残差分支的输出投影再乘 <span class="arithmatex">\(1/\sqrt{2N}\)</span>（<span class="arithmatex">\(N\)</span>=层数）——让残差流的方差在深度上
+保持 <span class="arithmatex">\(\approx\)</span> 常数（第 4 课的信号传播分析，深层版）。</p>
+<h2 id="3-gpt">3. 训练配置（本课的小 GPT）</h3>
+<table>
+<thead>
+<tr>
+<th>超参</th>
+<th>值</th>
+<th>nanoGPT 参考值</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>n_layer / n_head / n_embd</td>
+<td>4 / 4 / 128</td>
+<td>12 / 12 / 768</td>
+</tr>
+<tr>
+<td>block_size (上下文)</td>
+<td>64</td>
+<td>1024</td>
+</tr>
+<tr>
+<td>参数量</td>
+<td>~0.8 M</td>
+<td>124 M</td>
+</tr>
+<tr>
+<td>batch</td>
+<td>64</td>
+<td>12 (× 梯度累积)</td>
+</tr>
+<tr>
+<td>优化器</td>
+<td>AdamW (β₁=0.9, β₂=0.95), wd=0.1, lr=3e-4</td>
+<td>同款</td>
+</tr>
+<tr>
+<td>梯度裁剪</td>
+<td>1.0</td>
+<td>同款</td>
+</tr>
+<tr>
+<td>训练步数</td>
+<td>2000 (Mac 上 ~2 分钟)</td>
+<td>600k</td>
+</tr>
+</tbody>
+</table>
+<p>注意：<strong>唯一的区别是数字，不是结构</strong>。GPT-2/3/4 与这个玩具之间隔着的只是
+算力、数据和一堆工程。缩放定律 (Kaplan 2020)：损失随参数/数据/算力按幂律平滑下降——
+"大力出奇迹"是被实验证实过的物理。</p>
+<h2 id="4">4. 采样：从分布到文本</h3>
+<p>训练完的模型给出每个位置的下一个 token 分布 <span class="arithmatex">\(p\)</span>，生成时要从中<strong>采样</strong>：</p>
+<ul>
+<li><strong>温度</strong> <span class="arithmatex">\(T\)</span>：<span class="arithmatex">\(p_i \propto e^{\text{logit}_i/T}\)</span>（第 3 课的玻尔兹曼分布！）</li>
+<li><span class="arithmatex">\(T \to 0\)</span>：贪心，永远选最大（稳定但乏味、易复读）</li>
+<li><span class="arithmatex">\(T = 1\)</span>：模型原分布；<span class="arithmatex">\(T &gt; 1\)</span>：更发散</li>
+<li><strong>top-k</strong>：只保留概率前 k 的候选再归一化（砍掉长尾胡话）</li>
+<li><strong>top-p (nucleus)</strong>：保留累积概率达 p 的最小集合（练习 1 请你实现）</li>
+</ul>
+<h2 id="5">5. 运行</h3>
+<pre><code class="language-bash">python train.py                 # 训练 + 存 model.pt + 生成样例 (~2~3 分钟)
+python train.py --iters 500     # 快速验证版
+python sample.py --temperature 0.8 --top-k 40   # 用训好的模型续写
+python ablation.py              # 消融实验: 拆掉残差/位置编码的对照 (反面教材)
+python exercises.py
+</code></pre>
+<p>训练结束会打印 val loss、损失曲线 (<code>figures/gpt_loss.png</code>)、生成样例
+(<code>figures/gpt_sample.txt</code>)。我已替你跑过一次，样例贴在下方（训练日志另见 <code>figures/</code>）。</p>
+<h2 id="6-attention-is-all-you-need-vaswani-et-al-2017">6. 论文对照表 (Attention Is All You Need, Vaswani et al. 2017)</h3>
+<table>
+<thead>
+<tr>
+<th>论文</th>
+<th>代码</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>§3.1 encoder-decoder</td>
+<td>我们只留 decoder（GPT 路线）；<code>model.py</code> 的 GPT 类</td>
+</tr>
+<tr>
+<td>§3.2.1 Scaled Dot-Product Attention</td>
+<td><code>CausalSelfAttention.forward</code></td>
+</tr>
+<tr>
+<td>§3.2.2 Multi-Head</td>
+<td>同上，<code>split/transpose/reshape</code></td>
+</tr>
+<tr>
+<td>§3.3 Position-wise FFN</td>
+<td><code>MLP</code> 类 (d→4d→d, GELU)</td>
+</tr>
+<tr>
+<td>§3.4 Positional Encoding</td>
+<td><code>GPT.pos_emb</code>（GPT 用可学习版本）</td>
+</tr>
+<tr>
+<td>§3.5 Residual + LayerNorm</td>
+<td><code>Block.forward</code>（post-LN → 我们用 pre-LN）</td>
+</tr>
+<tr>
+<td>§5.4 Label smoothing</td>
+<td><strong>不用</strong>（GPT 系列不用，直配交叉熵）</td>
+</tr>
+</tbody>
+</table>
+<h2 id="mac-mps-2000-08m">我的训练结果（Mac, MPS, 2000 步, ~0.8M 参数）</h3>
+<p>最终 val 交叉熵 <strong>1.786（困惑度 6.0）</strong>，起点是均匀分布的 4.17（困惑度 64.6）。
+生成的"伪莎士比亚"（完整版见 <code>figures/gpt_sample.txt</code>）：</p>
+<pre><code>POMPEY:
+This maide lear golloss and bloody, by this,
+In a crome the scastle
+Heirt him husburin heart cale me such brone
+To a course. That put is fone esent of the me;
+That he did thave of more.
+
+QUEEN MARGARET:
+And no come bid it ha chartimes hell.
+</code></pre>
+<p>0.8M 参数已经能拼出莎士比亚式的对白结构、人名与换行节奏（词汇还是"梦话"级——
+这正是 scaling 空间）；把配置改成 6/6/384（nanoGPT 的"复现 GPT-2 124M"的 1/10 档）
+过夜训练，输出就相当像样了——练手绝佳目标。</p>
+<h2 id="_1">练习</h3>
+<ol>
+<li><strong>top-p 采样</strong>：实现 nucleus sampling 并测试边界行为。</li>
+<li><strong>手写 GELU</strong>：用 tanh 近似公式实现 GELU，与 <code>F.gelu</code> 对拍。</li>
+<li><strong>带预热的余弦学习率</strong>：实现 <code>warmup + cosine decay</code> 调度器（大模型训练标配）。</li>
+</ol>
+<h2 id="_2">毕业之后</h3>
+<ul>
+<li>把 <code>--n-layer 6 --n-embd 384</code> 跑一个过夜训练（MPS 约 2~4 小时）</li>
+<li>换语料：把 <code>data/shakespeare.txt</code> 换成任何 UTF-8 文本（中文小说直接可用！
+  字符级 tokenizer 天然支持），重新 <code>python train.py</code></li>
+<li>读 nanoGPT 源码，你会发现每一行都眼熟</li>
+<li>Karpathy 的 <em>Let's reproduce GPT-2 (124M)</em>：从这里到工业级的完整地图</li>
+</ul>
+</div>
+</div>
+<!--BOOK-END-->
 <div class="card bridge">
   <h2>🧪 去终端做真的训练 (毕业战)</h2>
   <p><code>cd 10_transformer && python model.py</code>（自检: 形状+因果性）→

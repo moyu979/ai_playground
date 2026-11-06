@@ -37,6 +37,8 @@
   footer{padding:10px 26px 34px;color:var(--muted);font-size:13px;max-width:1000px}
   footer a{color:var(--blue)}
 </style>
+<script>window.MathJax = { tex: { inlineMath: [["$", "$"], ["\\(", "\\)"]], displayMath: [["$$", "$$"], ["\\[", "\\]"]] }, svg: { fontCache: "global" }, options: { skipHtmlTags: ["script", "noscript", "style", "textarea", "pre", "code"] } };</script>
+<script defer src="../assets/mathjax/tex-svg.js"></script>
 </head>
 <body>
 <header>
@@ -97,6 +99,115 @@
   <p class="stat">第 09 课注意力 <code>softmax(QKᵀ/√d)V</code> 用 einsum 一行写出。</p>
 </div>
 
+<!--BOOK-START-->
+<div class="card" id="book">
+  <style>
+  .book{font-size:14px;line-height:1.85}
+  .book h2{font-size:16.5px;margin:26px 0 8px;padding-top:10px;border-top:1px dashed var(--line)}
+  .book h3{font-size:14.5px;margin:18px 0 6px}
+  .book p{margin:9px 0}
+  .book code{background:#eef1f6;border-radius:5px;padding:1px 6px;font-size:12.5px}
+  .book pre{background:#0d1220;color:#d8e0f0;border-radius:10px;padding:13px 16px;overflow:auto;
+            font-family:ui-monospace,Menlo,monospace;font-size:12.5px;line-height:1.7}
+  .book pre code{background:none;padding:0;color:inherit}
+  .book table{border-collapse:collapse;font-size:13px;width:100%;margin:10px 0}
+  .book td,.book th{border:1px solid var(--line);padding:6px 10px;text-align:left}
+  .book th{background:#f4f7fc}
+  .book ul,.book ol{line-height:1.8;padding-left:22px}
+  .book blockquote{border-left:4px solid var(--orange);background:#fff8ef;margin:10px 0;
+                   padding:8px 14px;border-radius:0 8px 8px 0}
+  .book a{color:var(--blue)}
+  .book mjx-container{overflow-x:auto;overflow-y:hidden;max-width:100%}
+  .gen{font-size:11.5px;color:var(--muted);font-weight:400;margin-left:8px}
+  </style>
+
+<h2>📖 教材全文<span class="gen">由 01_numpy/README.md 自动生成 — 修改后运行 <code>python tools/build_book.py</code> 重新编译</span></h2>
+<div class="book">
+<h1 id="01-numpy-90">第 01 课 · NumPy 速成 — 为深度学习定制的 90 分钟</h1>
+<blockquote>
+<p>🌐 配套互动网页：<a href="../pages/01_numpy.html">01_numpy.html</a>（讲解精华 + 可玩 demo，无需任何安装）</p>
+<p>物理人视角：NumPy 就是你的"张量计算器"。以后 PyTorch 的 Tensor 几乎是它的超集，
+这 90 分钟的投入在后面每一课都会复利。</p>
+</blockquote>
+<h2 id="numpy">为什么是 NumPy</h3>
+<p>你写过的物理模拟大概长这样：对一个场 <code>f[x][y]</code> 做演化，写双重循环。
+NumPy 的思维方式是反过来的：<strong>不问"每个格点怎么算"，只问"整个场怎么一次性变换"</strong>。
+这就是<strong>向量化（vectorization）</strong>——把循环下沉到 C/Fortran/BLAS 层。</p>
+<p>深度学习 = 大规模矩阵乘法 + 非线性变换。模型参数是矩阵，数据是矩阵，梯度还是矩阵。
+NumPy 熟练度直接决定你读代码的速度。</p>
+<h2 id="1-ndarray">1. ndarray：一切皆数组</h3>
+<pre><code class="language-python">import numpy as np
+
+a = np.array([[1., 2., 3.],
+              [4., 5., 6.]])   # shape (2, 3) 的二维数组 = 矩阵
+a.shape      # (2, 3)  ← 想成&quot;张量的量纲&quot;
+a.dtype      # float64 ← 默认;  深度学习几乎总用 float32
+a.ndim       # 2
+</code></pre>
+<ul>
+<li>物理里你区分标量/矢量/张量；NumPy 里它们统一是 <code>ndarray</code>，只是 <code>shape</code> 不同：
+  标量 <code>()</code>，矢量 <code>(3,)</code>，矩阵 <code>(3, 3)</code>，三阶张量 <code>(3, 3, 3)</code>。</li>
+<li><strong>约定（本课程全程遵守）</strong>：数据批次的第一维是 batch。
+  一个 batch 的输入是 <code>(B, d)</code>，B 个样本、每个样本 d 维。</li>
+</ul>
+<h2 id="2-broadcasting">2. 广播（broadcasting）— 最重要的一条规则</h3>
+<p>两个数组运算时，NumPy 从<strong>最后一个维度向前</strong>对齐，维度相等或其中一方为 1 时兼容，
+为 1 的那维自动"复制"（虚拟地，不花内存）：</p>
+<pre><code>A (2, 3)      B (3,)    →  B 视为 (1, 3) → 复制为 (2, 3)   ✓
+A (2, 3)      C (2, 1)  →  C 复制为 (2, 3)                  ✓
+A (2, 3)      D (2,)    →  (2,) 对齐到 (3,) 失败            ✗ 报错
+</code></pre>
+<p>经典用法（后面天天见）：</p>
+<pre><code class="language-python">X -= X.mean(axis=0)          # 每列去均值 (数据标准化)
+X /= X.std(axis=0) + 1e-8    # 每列除以标准差; +1e-8 防除零, 神经网络代码的经典后缀
+logits += np.array([-2., 1., 3.])   # batch 中每个样本都加同一个偏置
+</code></pre>
+<h2 id="3">3. 索引：切片、掩码、花式索引</h3>
+<pre><code class="language-python">X[0]          # 第 0 行 (第 0 个样本)
+X[:, 0]       # 所有行的第 0 列  ← 注意别写成 X[0] 后再[0]
+X[mask]       # 布尔掩码: 取出 mask 为 True 的行 —— 筛数据全靠它
+X[[2, 0, 1]]  # 花式索引: 按 (2,0,1) 的顺序重排行 —— 打乱数据集全靠它
+</code></pre>
+<h2 id="4-einsum">4. einsum — 物理人的母语</h3>
+<p><code>np.einsum</code> 直接用指标记号写张量运算，你在 QFT/广义相对论里写过的东西原样可用：</p>
+<pre><code class="language-python">C = np.einsum('ij,jk-&gt;ik', A, B)     # 矩阵乘: C_ik = Σ_j A_ij B_jk
+s = np.einsum('i,i-&gt;',  v,  v)       # 内积:   s   = Σ_i v_i v_i
+O = np.einsum('ij,kj-&gt;ik', A, B)     # A @ B.T: O_ik = Σ_j A_ij B_kj
+</code></pre>
+<p>规则就是：重复指标求和，箭头右边没出现的指标被"吃掉"。
+第 9 课的注意力机制 <code>softmax(QKᵀ/√d)V</code> 用 einsum 写一行就出来。</p>
+<h2 id="5">5. 随机数与可复现性</h3>
+<pre><code class="language-python">rng = np.random.default_rng(seed=42)   # 新式写法; 永远带上 seed, 实验才可复现
+rng.normal(0, 1, size=(100, 2))        # 高斯噪声
+rng.uniform(-1, 1, size=(3, 3))        # 均匀分布 (初始化权重用)
+rng.permutation(100)                   # 打乱索引
+</code></pre>
+<h2 id="6">6. 向量化思维的两个模板</h3>
+<p><strong>模板 A：逐样本循环 → 一次算完</strong></p>
+<pre><code class="language-python"># ❌ 慢: 对每个样本单独算距离
+d = np.array([np.linalg.norm(x - c) for x in X])
+
+# ✓ 快: 广播 (N,1,d) - (1,d) → (N,d), 一次算出 N 个距离
+d = np.linalg.norm(X - c, axis=1)
+</code></pre>
+<p><strong>模板 B：手写公式 → 矩阵形式</strong></p>
+<p>最小二乘的正规方程你肯定眼熟：</p>
+<div class="arithmatex">\[\theta = (X^T X)^{-1} X^T y\]</div>
+<p>NumPy 里就是一行 <code>theta = np.linalg.solve(X.T @ X, X.T @ y)</code>
+（生产代码用 <code>solve</code> 而不是 <code>inv</code> 再乘——数值更稳定，和物理里避免显式求逆同理）。</p>
+<h2 id="_1">运行本课代码</h3>
+<pre><code class="language-bash">python numpy_crash.py    # 交互式演示: 每一节都会打印结果并生成图
+python exercises.py      # 练习: 把 NotImplementedError 补全, 自动测试
+python solutions.py      # 参考答案 (先自己做!)
+</code></pre>
+<h2 id="exercisespy-8">练习（exercises.py，约 8 题）</h3>
+<p>覆盖：softmax（第 3 课主角）、行归一化、one-hot、<strong>广播算两两距离</strong>、einsum 算
+Gram 矩阵、accuracy、<strong>数值梯度</strong>（第 4 课梯度检查的工具）、mini-batch 迭代器
+（每课训练循环都要用）。</p>
+<p>做完这些，你写后面所有课的代码都不会被 NumPy 卡住。</p>
+</div>
+</div>
+<!--BOOK-END-->
 <div class="card bridge">
   <h2>🧪 去终端做真练习</h2>
   <p>网页看懂规则，终端练手感（8 道题自动判分，含两两距离、数值梯度——第 4 课的保命工具）：</p>

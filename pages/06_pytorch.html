@@ -37,6 +37,8 @@
   footer{padding:10px 26px 34px;color:var(--muted);font-size:13px;max-width:1100px}
   footer a{color:var(--blue)}
 </style>
+<script>window.MathJax = { tex: { inlineMath: [["$", "$"], ["\\(", "\\)"]], displayMath: [["$$", "$$"], ["\\[", "\\]"]] }, svg: { fontCache: "global" }, options: { skipHtmlTags: ["script", "noscript", "style", "textarea", "pre", "code"] } };</script>
+<script defer src="../assets/mathjax/tex-svg.js"></script>
 </head>
 <body>
 <header>
@@ -97,6 +99,142 @@
   </table>
 </div>
 
+<!--BOOK-START-->
+<div class="card" id="book">
+  <style>
+  .book{font-size:14px;line-height:1.85}
+  .book h2{font-size:16.5px;margin:26px 0 8px;padding-top:10px;border-top:1px dashed var(--line)}
+  .book h3{font-size:14.5px;margin:18px 0 6px}
+  .book p{margin:9px 0}
+  .book code{background:#eef1f6;border-radius:5px;padding:1px 6px;font-size:12.5px}
+  .book pre{background:#0d1220;color:#d8e0f0;border-radius:10px;padding:13px 16px;overflow:auto;
+            font-family:ui-monospace,Menlo,monospace;font-size:12.5px;line-height:1.7}
+  .book pre code{background:none;padding:0;color:inherit}
+  .book table{border-collapse:collapse;font-size:13px;width:100%;margin:10px 0}
+  .book td,.book th{border:1px solid var(--line);padding:6px 10px;text-align:left}
+  .book th{background:#f4f7fc}
+  .book ul,.book ol{line-height:1.8;padding-left:22px}
+  .book blockquote{border-left:4px solid var(--orange);background:#fff8ef;margin:10px 0;
+                   padding:8px 14px;border-radius:0 8px 8px 0}
+  .book a{color:var(--blue)}
+  .book mjx-container{overflow-x:auto;overflow-y:hidden;max-width:100%}
+  .gen{font-size:11.5px;color:var(--muted);font-weight:400;margin-left:8px}
+  </style>
+
+<h2>📖 教材全文<span class="gen">由 06_pytorch/README.md 自动生成 — 修改后运行 <code>python tools/build_book.py</code> 重新编译</span></h2>
+<div class="book">
+<h1 id="06-pytorch-micrograd">第 06 课 · PyTorch 入门 — 你的 micrograd, 工业级版本</h1>
+<blockquote>
+<p>🌐 配套互动网页：<a href="../pages/06_pytorch.html">06_pytorch.html</a>（讲解精华 + 可玩 demo，无需任何安装）</p>
+<p>PyTorch = 你已经会的东西的工业级实现：
+<strong>NumPy 的张量 API + 第 5 课的自动微分引擎（张量版）+ GPU/MPS 加速 + 现成的神经网络积木</strong>。
+本课结束后，你写的每一行 PyTorch 都能对应到前 5 课的某个公式。</p>
+</blockquote>
+<h2 id="1-tensor-ndarrayapi">1. Tensor ≈ ndarray（API 几乎照抄）</h3>
+<pre><code class="language-python">import torch
+X = torch.tensor([[1., 2.], [3., 4.]])   # 对应 np.array
+X = torch.from_numpy(arr)                # 零拷贝互转 (CPU)
+X @ X.T, X.sum(0), X.reshape(2, 2)       # 运算符一一对应
+</code></pre>
+<p>差别只有三处：
+1. <code>dtype</code> 默认 <code>float32</code>（NumPy 是 64）——深度学习用单精度换速度
+2. 张量可以住在 <strong>device</strong> 上：<code>"cpu" / "mps" (Apple GPU) / "cuda" (NVIDIA)</code>
+3. 张量可以携带<strong>求导记录</strong></p>
+<h2 id="2-autograd-5-value">2. autograd：第 5 课的 Value, 矩阵版</h3>
+<pre><code class="language-python">x = torch.tensor(2.0, requires_grad=True)
+y = x * x + x          # 和第 5 课演示 2 同一个表达式
+y.backward()
+x.grad                 # tensor(5.) —— 2x+1, 对上了!
+</code></pre>
+<p>概念对照：</p>
+<table>
+<thead>
+<tr>
+<th>micrograd (第 5 课)</th>
+<th>PyTorch</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Value.data</code></td>
+<td><code>tensor.data</code> / <code>tensor.detach()</code></td>
+</tr>
+<tr>
+<td><code>Value.grad</code></td>
+<td><code>tensor.grad</code></td>
+</tr>
+<tr>
+<td><code>loss.backward()</code></td>
+<td><code>loss.backward()</code> (一模一样!)</td>
+</tr>
+<tr>
+<td>手动 <code>p.grad = 0.0</code></td>
+<td><code>optimizer.zero_grad()</code></td>
+</tr>
+<tr>
+<td>关闭求导记录</td>
+<td><code>with torch.no_grad():</code></td>
+</tr>
+</tbody>
+</table>
+<blockquote>
+<p><code>zero_grad</code> 为什么存在？第 5 课讲过梯度是<strong>累加</strong>的（分叉变量 +=）。
+PyTorch 默认延续这一语义，所以每步训练前要把上一步的梯度清零。
+忘了清零 = 梯度随时间求和 = 训练诡异发散 —— 新手最常见 bug 之一。</p>
+</blockquote>
+<h2 id="3-nnmodule">3. nn.Module：层的容器与参数管理器</h3>
+<pre><code class="language-python">class Net(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.fc1 = nn.Linear(2, 64)     # = 第 4 课的 Dense(2→64)
+        self.fc2 = nn.Linear(64, 64)
+        self.fc3 = nn.Linear(64, 3)
+    def forward(self, x):
+        x = torch.tanh(self.fc1(x))     # = Activation('tanh')
+        x = torch.tanh(self.fc2(x))
+        return self.fc3(x)              # 输出 logits (softmax 在损失里)
+</code></pre>
+<p>继承 <code>nn.Module</code> 后自动获得：
+- <code>net.parameters()</code> —— 所有可学习参数的迭代器（交给 optimizer）
+- <code>net.train() / net.eval()</code> —— 切换 Dropout/BN 行为（第 7 课会遇到）
+- <code>net.to(device)</code> —— 一行把全部参数搬上 GPU</p>
+<p><strong>nn.CrossEntropyLoss = softmax + NLL 的融合稳定版</strong>（第 3 课 log-sum-exp 的实现），
+输入是 logits，不是概率——所以网络最后一层不加激活。</p>
+<h2 id="4">4. 训练循环：五步真言（全课程通用模板，背下来）</h3>
+<pre><code class="language-python">for xb, yb in batches:
+    logits = net(xb)                     # ① 前向
+    loss = F.cross_entropy(logits, yb)   # ② 损失
+    optimizer.zero_grad()                # ③ 清梯度 (§2 的坑)
+    loss.backward()                      # ④ 反传 (第 5 课的引擎)
+    optimizer.step()                     # ⑤ 更新 (第 2 课的 SGD)
+</code></pre>
+<p><code>optimizer.step()</code> 做的事就是第 4 课 <code>Dense.step(lr)</code> 里的
+<code>W -= lr * dW</code>，只是对所有参数批量执行。Adam 等花式优化器是更新规则的变体
+（动量 = 第 2 课练习 1；自适应学习率 = 练习 3）。</p>
+<h2 id="5">5. 运行</h3>
+<pre><code class="language-bash">python torch_basics.py     # 张量/autograd 热身 (打印教学)
+python mlp_pytorch.py      # 用 PyTorch 重打第 4 课的螺旋之战, 对比损失曲线
+python common_bugs.py      # 反面教材: 忘记 zero_grad / step 的对照实验
+python exercises.py
+</code></pre>
+<p><code>mlp_pytorch.py</code> 会自动加载第 4 课保存的 NumPy 损失曲线
+(<code>../04_neural_network/figures/spiral_loss.pkl</code>) 画在同图对比——
+<strong>同一个网络、同一个数据，两种实现应基本重合</strong>。这是"手写=框架"的直接证据。</p>
+<h2 id="_1">练习</h3>
+<ol>
+<li><strong>nn.Sequential</strong>：不用 class，用 <code>nn.Sequential(nn.Linear(...), nn.Tanh(), ...)</code>
+   重建同结构网络并训练。</li>
+<li><strong>早停</strong>：划分 train/val，监控 val 准确率，保存最佳模型状态
+   (<code>copy.deepcopy(net.state_dict())</code>)，返回最佳 val 准确率。</li>
+<li><strong>优化器对决</strong>：SGD vs Adam，同一网络各跑一遍，画损失对比。</li>
+</ol>
+<h2 id="_2">下一课预告</h3>
+<p>MLP 把输入当"一袋独立数字"。图像有空间结构——相邻像素相关、
+平移不该改变结论。第 7 课用<strong>卷积</strong>把这种结构先验写进网络
+（物理人：这就是"系统具有平移对称性 → 算符可交换 → 用 Green 函数思考"）。</p>
+</div>
+</div>
+<!--BOOK-END-->
 <div class="card bridge">
   <h2>🧪 去终端做真练习</h2>
   <p><code>cd 06_pytorch && python mlp_pytorch.py</code>（重打第 4 课的螺旋之战，

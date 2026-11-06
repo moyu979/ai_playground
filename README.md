@@ -70,6 +70,10 @@ python linear_regression.py    # 运行代码，图表自动存入 figures/
 └── figures/       ← 运行脚本后自动生成的图
 ```
 
+> 🌐 每课的**互动网页**（`pages/xx.html`）= 讲解精华 + 可玩 demo + **教材全文**
+> （由 README.md 自动编译，公式用本地 MathJax 渲染，离线可用）。
+> 改了 README 之后运行 `python tools/build_book.py` 重新生成。
+
 ## 学习建议
 
 - **动手 > 阅读**：代码里所有标了 `# 实验` 的地方，改改参数再跑一遍。训练崩溃了？好事，那是直觉在增长。

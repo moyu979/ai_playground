@@ -34,6 +34,8 @@
   footer a{color:var(--blue)}
   .legend span{margin-right:16px;font-size:12.5px;color:var(--muted)}
 </style>
+<script>window.MathJax = { tex: { inlineMath: [["$", "$"], ["\\(", "\\)"]], displayMath: [["$$", "$$"], ["\\[", "\\]"]] }, svg: { fontCache: "global" }, options: { skipHtmlTags: ["script", "noscript", "style", "textarea", "pre", "code"] } };</script>
+<script defer src="../assets/mathjax/tex-svg.js"></script>
 </head>
 <body>
 <header>
@@ -77,6 +79,157 @@
      引擎梯度和有限差分应当一致到小数点后 6 位。</p>
 </div>
 
+<!--BOOK-START-->
+<div class="card" id="book">
+  <style>
+  .book{font-size:14px;line-height:1.85}
+  .book h2{font-size:16.5px;margin:26px 0 8px;padding-top:10px;border-top:1px dashed var(--line)}
+  .book h3{font-size:14.5px;margin:18px 0 6px}
+  .book p{margin:9px 0}
+  .book code{background:#eef1f6;border-radius:5px;padding:1px 6px;font-size:12.5px}
+  .book pre{background:#0d1220;color:#d8e0f0;border-radius:10px;padding:13px 16px;overflow:auto;
+            font-family:ui-monospace,Menlo,monospace;font-size:12.5px;line-height:1.7}
+  .book pre code{background:none;padding:0;color:inherit}
+  .book table{border-collapse:collapse;font-size:13px;width:100%;margin:10px 0}
+  .book td,.book th{border:1px solid var(--line);padding:6px 10px;text-align:left}
+  .book th{background:#f4f7fc}
+  .book ul,.book ol{line-height:1.8;padding-left:22px}
+  .book blockquote{border-left:4px solid var(--orange);background:#fff8ef;margin:10px 0;
+                   padding:8px 14px;border-radius:0 8px 8px 0}
+  .book a{color:var(--blue)}
+  .book mjx-container{overflow-x:auto;overflow-y:hidden;max-width:100%}
+  .gen{font-size:11.5px;color:var(--muted);font-weight:400;margin-left:8px}
+  </style>
+
+<h2>📖 教材全文<span class="gen">由 05_autograd/README.md 自动生成 — 修改后运行 <code>python tools/build_book.py</code> 重新编译</span></h2>
+<div class="book">
+<h1 id="05-100-pytorch">第 05 课 · 自动微分引擎 — 100 行代码造一个 PyTorch 心脏</h1>
+<blockquote>
+<p>🌐 配套互动网页：<a href="../pages/05_autograd.html">05_autograd.html</a>（讲解精华 + 可玩 demo，无需任何安装）</p>
+<p>上节课你亲手推了一遍反向传播，也体会到了它的痛：<strong>换个结构就要重推</strong>，
+而且 <code>tanh'</code>、矩阵转置、除 <span class="arithmatex">\(B\)</span>……每一处都可能写错。
+本课把这件事自动化。造完这个引擎，<code>loss.backward()</code> 对你永远是透明的。
+设计与实现致敬 Karpathy 的 <a href="https://github.com/karpathy/micrograd">micrograd</a>
+（配套视频 <em>The spelled-out intro to neural networks and backpropagation</em> 强烈推荐）。</p>
+</blockquote>
+<h2 id="1">1. 核心思想：把链式法则外包给计算图</h3>
+<p>任何损失——不管多复杂——都是由<strong>一串初等运算</strong>拼出来的：
+加、乘、幂、tanh……每种运算自己知道局部导数：</p>
+<table>
+<thead>
+<tr>
+<th>运算</th>
+<th>前向</th>
+<th>局部导数 (∂out/∂每个输入)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>加</td>
+<td><span class="arithmatex">\(c = a+b\)</span></td>
+<td><span class="arithmatex">\(\partial c/\partial a = 1\)</span>, <span class="arithmatex">\(\partial c/\partial b = 1\)</span></td>
+</tr>
+<tr>
+<td>乘</td>
+<td><span class="arithmatex">\(c = a\cdot b\)</span></td>
+<td><span class="arithmatex">\(\partial c/\partial a = b\)</span>, <span class="arithmatex">\(\partial c/\partial b = a\)</span></td>
+</tr>
+<tr>
+<td>幂</td>
+<td><span class="arithmatex">\(c = a^k\)</span></td>
+<td><span class="arithmatex">\(\partial c/\partial a = k a^{k-1}\)</span></td>
+</tr>
+<tr>
+<td>tanh</td>
+<td><span class="arithmatex">\(c = \tanh a\)</span></td>
+<td><span class="arithmatex">\(\partial c/\partial a = 1 - c^2\)</span></td>
+</tr>
+</tbody>
+</table>
+<p><strong>链式法则</strong>：损失对某变量的导数 = （损失对该运算输出的导数）×（该运算对输入的局部导数），
+沿所有路径求和。</p>
+<p>所以每个运算只需做两件事：
+1. 前向：算出输出值，<strong>记住自己吃过哪些输入</strong>
+2. 被反传调用时：<code>输入.grad += 上游梯度 × 局部导数</code></p>
+<p>剩下的调度（谁先谁后）交给<strong>拓扑排序</strong>：按计算图从输出往输入的逆拓扑序，
+保证处理每个节点时它的上游梯度已经齐了。</p>
+<h2 id="2-value">2. <code>Value</code> 类：会自动求导的"数字"</h3>
+<pre><code class="language-python">class Value:
+    data        # 数值本身
+    grad        # ∂L/∂self, 反传时累积
+    _prev       # 我的输入节点 (孩子)
+    _backward   # 闭包: 把 out.grad 分发给孩子
+</code></pre>
+<p><strong>为什么是 <code>+=</code>？</strong> 一个变量常被多处使用（分叉）：
+<code>c = a+b; d = a*b</code> 中 <span class="arithmatex">\(a\)</span> 有两条路到 <span class="arithmatex">\(L\)</span>，总梯度 = 两条路之和
+（多元链式法则）。所以每次反传经过 <span class="arithmatex">\(a\)</span> 都累加，初始化为 0。</p>
+<p><strong>一次完整的 <code>backward()</code></strong>（<code>micrograd.py</code> 第 60~75 行）：</p>
+<pre><code class="language-python">topo = []                       # 后序 DFS → 拓扑序
+visited = set()
+def build(v):
+    if v not in visited:
+        visited.add(v)
+        for child in v._prev: build(child)
+        topo.append(v)
+build(self)                     # topo: 输入在前, 输出在后
+self.grad = 1.0                 # dL/dL = 1
+for v in reversed(topo):        # 从输出往输入
+    v._backward()               # 把 v.grad 分发给 v 的孩子们
+</code></pre>
+<h2 id="3-4">3. 它和第 4 课是什么关系？</h3>
+<table>
+<thead>
+<tr>
+<th></th>
+<th>第 4 课（手写 numpy MLP）</th>
+<th>第 5 课（autograd 引擎）</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>反传谁</td>
+<td>写死的层序列</td>
+<td><strong>任意</strong>由这些运算构成的表达式</td>
+</tr>
+<tr>
+<td>链式法则</td>
+<td>你推导的 (公式 4~8)</td>
+<td>拓扑序自动执行</td>
+</tr>
+<tr>
+<td>加新结构</td>
+<td>重推公式</td>
+<td>直接写前向，梯度免费</td>
+</tr>
+<tr>
+<td>代价</td>
+<td>快（矩阵乘，BLAS）</td>
+<td>慢（标量运算，教学用）</td>
+</tr>
+</tbody>
+</table>
+<p>PyTorch = 这个思想 + 矩阵级运算 + GPU。你第 4 课推导的四个公式，
+在这里退化成 <code>add/mul/tanh</code> 三行的 <code>_backward</code> 闭包——<strong>数学并没有变</strong>。</p>
+<h2 id="4">4. 运行</h3>
+<pre><code class="language-bash">python micrograd.py        # 演示: 表达式求导 + 数值梯度检查
+python mlp_micrograd.py    # 用引擎搭 MLP 训练双月, 画决策边界
+python exercises.py
+</code></pre>
+<h2 id="_1">练习</h3>
+<ol>
+<li><strong>组合运算</strong>：用现有运算写出 sigmoid <span class="arithmatex">\(1/(1+e^{-v})\)</span>，数值验证其梯度。
+   （体会"新函数不需要改引擎"——这正是自动微分和手推的本质区别。）</li>
+<li><strong>MSE 损失</strong>：用 Value 写均方误差，对一个 toy 回归问题反传。</li>
+<li><strong>重演第 2 课</strong>：用引擎从零做线性回归 <span class="arithmatex">\(y = wx+b\)</span>（梯度全靠引擎），
+   3 分钟内你会看到"声明式求导"的威力。</li>
+</ol>
+<h2 id="_2">预告</h3>
+<p>引擎虽好，但标量运算太慢。第 6 课切换 PyTorch：同样的思想，
+张量级运算 + GPU + 现成的层。你会看到本课 <code>Value</code> 与 <code>torch.Tensor</code> 的
+一一对应——以及它快了 1000 倍的原因。</p>
+</div>
+</div>
+<!--BOOK-END-->
 <div class="card bridge">
   <h2>🧪 去终端做真练习</h2>
   <p><code>cd 05_autograd && python micrograd.py</code>（表达式求导 + 数值对拍），

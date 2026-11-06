@@ -35,6 +35,8 @@
   footer{padding:10px 26px 34px;color:var(--muted);font-size:13px;max-width:1100px}
   footer a{color:var(--blue)}
 </style>
+<script>window.MathJax = { tex: { inlineMath: [["$", "$"], ["\\(", "\\)"]], displayMath: [["$$", "$$"], ["\\[", "\\]"]] }, svg: { fontCache: "global" }, options: { skipHtmlTags: ["script", "noscript", "style", "textarea", "pre", "code"] } };</script>
+<script defer src="../assets/mathjax/tex-svg.js"></script>
 </head>
 <body>
 <header>
@@ -84,6 +86,111 @@
      ③ 随机几次，看"无意义核"的输出——<b>训练的任务就是把随机核变成有用的核</b>。</p>
 </div>
 
+<!--BOOK-START-->
+<div class="card" id="book">
+  <style>
+  .book{font-size:14px;line-height:1.85}
+  .book h2{font-size:16.5px;margin:26px 0 8px;padding-top:10px;border-top:1px dashed var(--line)}
+  .book h3{font-size:14.5px;margin:18px 0 6px}
+  .book p{margin:9px 0}
+  .book code{background:#eef1f6;border-radius:5px;padding:1px 6px;font-size:12.5px}
+  .book pre{background:#0d1220;color:#d8e0f0;border-radius:10px;padding:13px 16px;overflow:auto;
+            font-family:ui-monospace,Menlo,monospace;font-size:12.5px;line-height:1.7}
+  .book pre code{background:none;padding:0;color:inherit}
+  .book table{border-collapse:collapse;font-size:13px;width:100%;margin:10px 0}
+  .book td,.book th{border:1px solid var(--line);padding:6px 10px;text-align:left}
+  .book th{background:#f4f7fc}
+  .book ul,.book ol{line-height:1.8;padding-left:22px}
+  .book blockquote{border-left:4px solid var(--orange);background:#fff8ef;margin:10px 0;
+                   padding:8px 14px;border-radius:0 8px 8px 0}
+  .book a{color:var(--blue)}
+  .book mjx-container{overflow-x:auto;overflow-y:hidden;max-width:100%}
+  .gen{font-size:11.5px;color:var(--muted);font-weight:400;margin-left:8px}
+  </style>
+
+<h2>📖 教材全文<span class="gen">由 07_cnn/README.md 自动生成 — 修改后运行 <code>python tools/build_book.py</code> 重新编译</span></h2>
+<div class="book">
+<h1 id="07">第 07 课 · 卷积神经网络 — 把对称性写进架构</h1>
+<blockquote>
+<p>🌐 配套互动网页：<a href="../pages/07_cnn.html">07_cnn.html</a>（讲解精华 + 可玩 demo，无需任何安装）</p>
+<p>物理视角：<strong>对称性 → 守恒/不变性 → 简化描述</strong>，这条 Noether 式的逻辑链在
+深度学习里的对应物是：<strong>数据有平移对称性 → 特征检测器不应依赖位置 → 权重共享（卷积）</strong>。
+你在信号与系统里学的卷积 <span class="arithmatex">\(y(t) = \int h(\tau)x(t-\tau)d\tau\)</span> 就是同一操作——
+核 <span class="arithmatex">\(h\)</span> 是系统的脉冲响应，图像卷积里它是"特征检测器"。</p>
+</blockquote>
+<h2 id="1-mlp">1. MLP 处理图像的两个浪费</h3>
+<p>把 28×28 图像摊平成 784 维向量喂给 MLP：
+- <strong>参数爆炸且无结构</strong>：第一层 784×128 ≈ 10 万参数，每个参数只见过一个孤立像素——
+  但自然图像的统计规律（边缘、纹理）是<strong>空间局部</strong>的
+- <strong>无平移不变性</strong>：猫在左上角和右下角需要分别学两遍</p>
+<h2 id="2">2. 卷积：三个思想合一</h3>
+<p>对图像 <span class="arithmatex">\(X\)</span> 和小核 <span class="arithmatex">\(K\)</span>（比如 3×3），卷积输出：</p>
+<div class="arithmatex">\[Y_{ij} = \sum_{a}\sum_{b} K_{ab}\, X_{i+a,\, j+b}\]</div>
+<p>（严格数学卷积还要翻转 <span class="arithmatex">\(K\)</span>；深度学习省略翻转，即<strong>互相关</strong>——核是学出来的，
+翻转约定无关紧要。）</p>
+<ol>
+<li><strong>局部连接</strong>：每个输出只看 3×3 邻域（图像统计是局部的）</li>
+<li><strong>权重共享</strong>：同一个 <span class="arithmatex">\(K\)</span> 扫过全图 —— 10 万参数变 9 个！
+   平移一个特征检测器 = 用同一组权重</li>
+<li><strong>平移等变性</strong>：输入平移 → 特征图平移。再配 pooling/全局聚合 → 平移<strong>不变</strong>性</li>
+</ol>
+<blockquote>
+<p>验证参数直觉：<span class="arithmatex">\(K\)</span> 是 3×3×<span class="arithmatex">\(C_{in}\)</span>（对每个输入通道一份）+ 每输出通道一个偏置。
+卷积层参数量 = <span class="arithmatex">\(K_h K_w C_{in} C_{out} + C_{out}\)</span>，与图像大小无关。</p>
+</blockquote>
+<h2 id="3">3. 多通道与层次结构</h3>
+<ul>
+<li>输入图像本身是多通道的（灰度 1 通道 / RGB 3 通道）</li>
+<li>每个卷积层输出 <span class="arithmatex">\(C_{out}\)</span> 张"特征图"（feature map）——每个通道是一种特征检测器</li>
+<li><strong>层次化</strong>：第一层学边缘/条纹（Gabor 感），第二层学角/纹理块，
+  更深层学部件→物体。这与视觉皮层 V1→V4→IT 的层级惊人相似</li>
+<li>感受野（receptive field）随层数指数增长：两层 3×3 看到互补重叠的 5×5，
+  这就是"深比宽高效"的机制之一</li>
+</ul>
+<h2 id="4">4. 空间下采样</h3>
+<p>池化（2×2 max pooling）把每 2×2 区域取最大值：特征图尺寸减半，
+小幅平移不再改变输出（不变性），计算量减半。现代替代方案：<strong>stride=2 的卷积</strong>
+（下采样本身也可学习），练习 3 让你实测两者。</p>
+<h2 id="5-mnist-hello-world">5. MNIST：手写数字识别（深度学习的 "hello world"）</h3>
+<pre><code>输入 (B,1,28,28)
+  → Conv 3×3, 1→16  → ReLU → MaxPool 2×2   # 28→14, 学边缘笔画
+  → Conv 3×3, 16→32 → ReLU → MaxPool 2×2   # 14→7,  学笔画组合
+  → Flatten (32×7×7=1568) → Linear→128 → ReLU
+  → Linear→10                              # 每类一个 logit
+</code></pre>
+<p>~22 万参数，3 个 epoch 后测试准确率 ≈ <strong>99%</strong>。
+对比：第 4 课的 MLP 直接摊平也能到 ~97%——卷积的 2 个点来自<strong>结构先验</strong>。</p>
+<blockquote>
+<p><strong>对照实验</strong>（<code>mlp_vs_cnn.py</code>，同数据同预算）：摊平 MLP 用 101,770 参数到 91.4%，
+小 CNN 用 <strong>9,098 参数</strong>（1/11）到 <strong>94.4%</strong>。参数更少、精度更高——
+这就是把对称性写进架构的直接回报。</p>
+</blockquote>
+<h2 id="_1">运行</h3>
+<pre><code class="language-bash">python conv_numpy_demo.py   # 手写卷积核, 亲眼看到边缘检测; 与 torch 对拍
+python train_mnist.py       # 训练 CNN (数据已在本地, 无需下载)
+python train_mnist.py --epochs 1     # 赶时间时
+python mlp_vs_cnn.py        # 对照实验: 摊平 MLP vs 卷积 (同预算同数据)
+python exercises.py
+</code></pre>
+<p>产出图表（<code>figures/</code>）：
+1. <code>conv_kernels.png</code> — 原图 + 三种手工核的响应（竖直/水平边缘、模糊）
+2. <code>mnist_curves.png</code> — 训练损失与测试准确率
+3. <code>mnist_filters.png</code> — 第一层 16 个卷积核（自动学出的边缘检测器！）
+4. <code>mnist_featuremaps.png</code> — 一张测试图经过第一层后的 8 张特征图
+5. <code>mnist_predictions.png</code> — 12 张测试图与预测（错例标红）</p>
+<h2 id="_2">练习</h3>
+<ol>
+<li><strong>手写 conv2d</strong>（带 stride/padding），与 <code>torch.nn.functional.conv2d</code> 对拍。</li>
+<li><strong>参数计数</strong>：推导并实现一个卷积网络的参数量公式，与 <code>sum(p.numel())</code> 对拍。</li>
+<li><strong>Pool vs Stride</strong>：MaxPool 版 vs stride=2 卷积版，同预算对比精度与参数。</li>
+</ol>
+<h2 id="_3">预告</h3>
+<p>图像有空间结构，文本有<strong>时间/顺序结构</strong>。第 8 课开始处理序列：
+语言模型是什么、为什么 RNN 天生适合序列、以及它致命的梯度消失问题——
+这个 bug 将直接催生注意力机制。</p>
+</div>
+</div>
+<!--BOOK-END-->
 <div class="card bridge">
   <h2>🧪 去终端做真练习</h2>
   <p><code>cd 07_cnn && python conv_numpy_demo.py</code>（手写卷积 + torch 对拍），

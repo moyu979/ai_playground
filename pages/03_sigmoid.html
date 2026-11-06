@@ -33,6 +33,8 @@
   .formula{background:#0d1220;color:#d8e0f0;border-radius:10px;padding:12px 16px;
            font-family:ui-monospace,Menlo,monospace;font-size:13px;line-height:1.8;overflow:auto}
 </style>
+<script>window.MathJax = { tex: { inlineMath: [["$", "$"], ["\\(", "\\)"]], displayMath: [["$$", "$$"], ["\\[", "\\]"]] }, svg: { fontCache: "global" }, options: { skipHtmlTags: ["script", "noscript", "style", "textarea", "pre", "code"] } };</script>
+<script defer src="../assets/mathjax/tex-svg.js"></script>
 </head>
 <body>
 <header>
@@ -94,6 +96,111 @@ softmax(z)<sub>k</sub> = e<sup>z<sub>k</sub></sup>/Σ<sub>j</sub>e<sup>z<sub>j</
      若 y=1, 交叉熵 −log σ(z) = <b id="lv">0.693</b></p>
 </div>
 
+<!--BOOK-START-->
+<div class="card" id="book">
+  <style>
+  .book{font-size:14px;line-height:1.85}
+  .book h2{font-size:16.5px;margin:26px 0 8px;padding-top:10px;border-top:1px dashed var(--line)}
+  .book h3{font-size:14.5px;margin:18px 0 6px}
+  .book p{margin:9px 0}
+  .book code{background:#eef1f6;border-radius:5px;padding:1px 6px;font-size:12.5px}
+  .book pre{background:#0d1220;color:#d8e0f0;border-radius:10px;padding:13px 16px;overflow:auto;
+            font-family:ui-monospace,Menlo,monospace;font-size:12.5px;line-height:1.7}
+  .book pre code{background:none;padding:0;color:inherit}
+  .book table{border-collapse:collapse;font-size:13px;width:100%;margin:10px 0}
+  .book td,.book th{border:1px solid var(--line);padding:6px 10px;text-align:left}
+  .book th{background:#f4f7fc}
+  .book ul,.book ol{line-height:1.8;padding-left:22px}
+  .book blockquote{border-left:4px solid var(--orange);background:#fff8ef;margin:10px 0;
+                   padding:8px 14px;border-radius:0 8px 8px 0}
+  .book a{color:var(--blue)}
+  .book mjx-container{overflow-x:auto;overflow-y:hidden;max-width:100%}
+  .gen{font-size:11.5px;color:var(--muted);font-weight:400;margin-left:8px}
+  </style>
+
+<h2>📖 教材全文<span class="gen">由 03_logistic_regression/README.md 自动生成 — 修改后运行 <code>python tools/build_book.py</code> 重新编译</span></h2>
+<div class="book">
+<h1 id="03">第 03 课 · 逻辑回归 — 当输出需要成为"概率"</h1>
+<blockquote>
+<p>🌐 配套互动网页：<a href="../pages/03_sigmoid.html">03_sigmoid.html</a>（讲解精华 + 可玩 demo，无需任何安装）</p>
+<p>物理视角：你早就见过今天的主角。
+<strong>sigmoid 就是费米–狄拉克分布</strong> <span class="arithmatex">\(\sigma(x) = 1/(e^{-x}+1)\)</span>（无简并费米子占据率）；
+<strong>softmax 就是玻尔兹曼分布</strong> <span class="arithmatex">\(p_i \propto e^{-E_i/T}\)</span>——把 logit 看成负能量，
+温度 <span class="arithmatex">\(T=1\)</span>。这不是巧合，这是"从分数到概率"的两次最大熵选择。</p>
+</blockquote>
+<h2 id="1">1. 分类问题：线性模型不够了</h3>
+<p>回归预测连续值，分类预测离散类别。手写 digit 是 0~9，垃圾邮件是 0/1。
+直接用上一课的直线 <span class="arithmatex">\(\hat y = wx+b\)</span> 有两个毛病：</p>
+<ol>
+<li>输出是 <span class="arithmatex">\((-\infty, +\infty)\)</span>，不是概率</li>
+<li>平方损失对分类是凸的但梯度在最错的地方反而不大，且统计上不再对应最大似然</li>
+</ol>
+<p><strong>解法：线性分数 → 概率的非线性映射。</strong></p>
+<h2 id="2-sigmoid">2. 二分类：sigmoid</h3>
+<p>给每个样本算一个"分数" <span class="arithmatex">\(z = w\cdot x + b\)</span>，再过 sigmoid：</p>
+<div class="arithmatex">\[p(y=1|x) = \sigma(z) = \frac{1}{1+e^{-z}}\]</div>
+<p>性质：<span class="arithmatex">\(\sigma'(z) = \sigma(z)(1-\sigma(z))\)</span>（求导只有一次乘法，这就是它历史上流行的原因），
+<span class="arithmatex">\(z\to\pm\infty\)</span> 时饱和到 1/0。</p>
+<h2 id="3">3. 损失：交叉熵 = 负对数似然</h3>
+<p>数据在模型下的对数似然（伯努利）：</p>
+<div class="arithmatex">\[\log p(D|w,b) = \sum_i \left[y_i \log p_i + (1-y_i)\log(1-p_i)\right]\]</div>
+<p>最大化似然 = 最小化它的负数（按样本平均），即<strong>二元交叉熵</strong>：</p>
+<div class="arithmatex">\[L = -\frac{1}{N}\sum_i \left[y_i \log p_i + (1-y_i)\log(1-p_i)\right]\]</div>
+<blockquote>
+<p>为什么不能用平方损失？理论上：平方损失对应高斯似然，分类标签是伯努利；
+实践上：sigmoid+平方损失的损失面非凸，交叉熵损失面是凸的（对逻辑回归）。</p>
+</blockquote>
+<p><strong>对 <span class="arithmatex">\(z\)</span> 求梯度（先自己推一遍，结果美得惊人）：</strong></p>
+<div class="arithmatex">\[\frac{\partial L}{\partial z_i} = p_i - y_i \quad\Leftarrow\quad \text{预测减标签，仅此而已}\]</div>
+<p>sigmoid 的饱和在求导时被 BCE 的 <span class="arithmatex">\(\log\)</span> 恰好抵消——这就是"配对"的意义。
+错误越离谱，梯度越大；预测正确，梯度归零。</p>
+<h2 id="4-softmax">4. 多分类：softmax</h3>
+<p><span class="arithmatex">\(K\)</span> 个类，每类一个线性分数 <span class="arithmatex">\(z_k = w_k \cdot x + b_k\)</span>（权重矩阵 <span class="arithmatex">\(W \in \mathbb R^{K\times d}\)</span>）：</p>
+<div class="arithmatex">\[p_k = \text{softmax}(z)_k = \frac{e^{z_k}}{\sum_{j} e^{z_j}}\]</div>
+<p>损失变成 <span class="arithmatex">\(K\)</span> 类交叉熵 <span class="arithmatex">\(L = -\frac1N \sum_i \log p_{y_i}\)</span>，对 <span class="arithmatex">\(z\)</span> 的梯度依旧是
+<strong>概率减 one-hot</strong>：<span class="arithmatex">\(\partial L/\partial z_{ik} = p_{ik} - \delta_{k,y_i}\)</span>。</p>
+<blockquote>
+<p><strong>玻尔兹曼彩蛋</strong>：logit <span class="arithmatex">\(z_k = -E_k/T\)</span>，则 <span class="arithmatex">\(p_k = e^{-E_k/T}/Z\)</span>。
+<span class="arithmatex">\(Z\)</span> 就是配分函数。第 10 课 GPT 生成文本时的"温度采样"会直接用这个 <span class="arithmatex">\(T\)</span>。</p>
+</blockquote>
+<h2 id="5-softmax">5. 数值稳定的 softmax（重要工程细节）</h3>
+<p><span class="arithmatex">\(z\)</span> 很大时 <span class="arithmatex">\(e^{z}\)</span> 上溢。利用 softmax 的平移不变性 <span class="arithmatex">\(\text{softmax}(z) = \text{softmax}(z - c)\)</span>，
+实现时<strong>永远先减去最大值</strong>：</p>
+<pre><code class="language-python">def softmax(z):
+    z = z - z.max(axis=-1, keepdims=True)   # 平移不变, 防溢出
+    e = np.exp(z)
+    return e / e.sum(axis=-1, keepdims=True)
+</code></pre>
+<p>同理交叉熵用 <span class="arithmatex">\(\log p = z_{y} - \log\sum_j e^{z_j}\)</span>（log-sum-exp）直接算，别先算 <span class="arithmatex">\(p\)</span> 再 <span class="arithmatex">\(\log\)</span>。
+练习 2 要求你实现它。</p>
+<h2 id="6">6. 决策边界：仍是线性的</h3>
+<p><span class="arithmatex">\(\sigma(z)=0.5\)</span> 处 <span class="arithmatex">\(z=0\)</span>，所以逻辑回归的决策边界是超平面 <span class="arithmatex">\(w \cdot x + b = 0\)</span>。
+看代码生成的图 2/图 4：它能切分线性可分的数据，对环形/螺旋形无能为力——
+<strong>这正是第 4 课引入隐藏层的动机</strong>。</p>
+<h2 id="_1">运行</h3>
+<pre><code class="language-bash">python logistic_regression.py   # 图: sigmoid、二分类边界、损失曲线、三分类区域、
+                                #     linear_fail.png (对照组: 圆环数据上露馅)
+python exercises.py
+</code></pre>
+<blockquote>
+<p><strong>对照组思维</strong>：说"逻辑回归简单有效"不算数——脚本最后会把同一个模型扔到
+线性不可分的圆环数据上，让你亲眼看到它卡在一条直线上的样子。
+（这也是第 4 课存在的理由。）</p>
+</blockquote>
+<h2 id="_2">练习</h3>
+<ol>
+<li><strong>稳定 softmax</strong>：写减最大值版本，用 <span class="arithmatex">\(10^4\)</span> 量级输入验证不溢出。</li>
+<li><strong>log-sum-exp 交叉熵</strong>：不经过概率直接算 <span class="arithmatex">\(\log p_y\)</span>，和朴素实现对比。</li>
+<li><strong>数值梯度检查</strong>：用第 1 课的 <code>finite_difference_grad</code> 验证 <span class="arithmatex">\(\partial L/\partial z = p - y\)</span>。
+   （从这课起，"梯度检查"是你代码的标配保险。）</li>
+</ol>
+<h2 id="_3">预告</h3>
+<p>逻辑回归 = "没有隐藏层的神经网络"。第 4 课加上隐藏层，就拥有了万能逼近——
+代价是反向传播的手工推导。所有素材今天已备齐：线性变换、sigmoid、交叉熵、
+<span class="arithmatex">\(\hat p - y\)</span> 梯度。缺的只是"多层链式求导的系统性方法"。</p>
+</div>
+</div>
+<!--BOOK-END-->
 <div class="card bridge">
   <h2>🧪 去终端做真练习</h2>
   <p><code>cd 03_logistic_regression && python logistic_regression.py</code>
