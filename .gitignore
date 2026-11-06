@@ -1,0 +1,11 @@
+__pycache__/
+*.pyc
+.DS_Store
+.ipynb_checkpoints/
+# 运行日志（本机产物）
+_test_log*.txt
+# torchvision 下载的 MNIST 原始数据（可重新下载）
+**/data/MNIST/
+# 训练得到的模型权重（体积大，可重新训练）
+*.pt
+*.pth

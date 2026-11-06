@@ -1,0 +1,948 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AI Playground · 神经网络游乐场</title>
+<style>
+  :root {
+    --orange: #e8871a;
+    --blue: #2f6feb;
+    --ink: #1f2430;
+    --muted: #6b7280;
+    --bg: #f7f7f9;
+    --card: #ffffff;
+    --line: #e5e7eb;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font-family: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", system-ui, sans-serif;
+  }
+  header {
+    padding: 18px 24px 10px;
+  }
+  header h1 { margin: 0 0 4px; font-size: 22px; }
+  header p { margin: 0; color: var(--muted); font-size: 13px; }
+  .tabs { margin: 12px 24px 0; display: flex; gap: 8px; }
+  .tab-btn {
+    border: 1px solid var(--line); background: #fff; border-radius: 8px 8px 0 0;
+    padding: 8px 16px; font-size: 14px; cursor: pointer; color: var(--muted);
+  }
+  .tab-btn.active { color: var(--ink); font-weight: 600; border-bottom-color: #fff; }
+  .panel {
+    margin: 0 24px 24px; background: var(--card); border: 1px solid var(--line);
+    border-radius: 0 10px 10px 10px; padding: 18px;
+    display: flex; flex-wrap: wrap; gap: 22px;
+  }
+  .col { display: flex; flex-direction: column; gap: 14px; }
+  .card {
+    border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px;
+    background: #fcfcfd;
+  }
+  .card h3 { margin: 0 0 8px; font-size: 13px; color: var(--muted); font-weight: 600; }
+  label.row { display: flex; align-items: center; justify-content: space-between;
+    gap: 10px; font-size: 13px; padding: 3px 0; }
+  select, input[type=range] { accent-color: var(--blue); }
+  select { font-size: 13px; padding: 3px 6px; border-radius: 6px;
+    border: 1px solid var(--line); background: #fff; }
+  .btns { display: flex; gap: 8px; }
+  button.act {
+    border: none; border-radius: 8px; padding: 8px 14px; font-size: 14px;
+    cursor: pointer; background: var(--blue); color: #fff; font-weight: 600;
+  }
+  button.act.secondary { background: #eef1f6; color: var(--ink); }
+  button.act.warn { background: #fee2e2; color: #b91c1c; }
+  button.mini {
+    width: auto; min-width: 26px; height: 24px; padding: 0 7px;
+    border-radius: 6px; border: 1px solid var(--line);
+    background: #fff; cursor: pointer; font-size: 13px; line-height: 1;
+    white-space: nowrap;
+  }
+  .layers-box { display: flex; flex-direction: column; gap: 6px; }
+  .layer-row { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+  .layer-row .name { width: 52px; color: var(--muted); }
+  canvas { border-radius: 8px; background: #fff; border: 1px solid var(--line); }
+  .stats { font-size: 13px; color: var(--muted); line-height: 1.7; }
+  .stats b { color: var(--ink); font-variant-numeric: tabular-nums; }
+  .legend { display: flex; gap: 14px; font-size: 12px; color: var(--muted); align-items: center; }
+  .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; margin-right: 4px; }
+  .note { font-size: 12px; color: var(--muted); line-height: 1.6; }
+  .note a { color: var(--blue); text-decoration: none; }
+  .hdr-btns { margin-top: 10px; display: flex; gap: 8px; }
+  .hdr-btns button {
+    border: 1px solid var(--line); background: #fff; border-radius: 8px;
+    padding: 6px 12px; font-size: 13px; cursor: pointer;
+  }
+  .hdr-btns button:hover { border-color: var(--blue); color: var(--blue); }
+  /* ---- 新手教程 ---- */
+  .tour-mask {
+    position: fixed; inset: 0; background: rgba(15, 18, 30, 0.45);
+    display: none; z-index: 40;
+  }
+  .tour-mask.show { display: block; }
+  .tour-card {
+    position: fixed; z-index: 50; left: 50%; bottom: 26px; transform: translateX(-50%);
+    width: min(560px, calc(100vw - 32px));
+    background: #fff; border: 1px solid var(--line); border-radius: 12px;
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.18); padding: 16px 18px;
+  }
+  .tour-card h3 { margin: 0 0 6px; font-size: 15px; }
+  .tour-card .body { font-size: 13.5px; line-height: 1.75; color: var(--ink); }
+  .tour-card .body code { background: #eef1f6; border-radius: 4px; padding: 1px 5px; }
+  .tour-card .body a { color: var(--blue); text-decoration: none; }
+  .tour-foot { display: flex; align-items: center; justify-content: space-between; margin-top: 12px; }
+  .tour-step { font-size: 12px; color: var(--muted); }
+  .tour-hl {
+    outline: 3px solid var(--orange) !important;
+    outline-offset: 2px; border-radius: 10px;
+    animation: tourpulse 1.2s ease-in-out infinite;
+    position: relative; z-index: 41;
+  }
+  @keyframes tourpulse { 50% { outline-color: rgba(232, 135, 26, 0.25); } }
+  /* ---- 实验清单 ---- */
+  .tasks-panel {
+    position: fixed; z-index: 60; right: 18px; top: 70px;
+    width: min(380px, calc(100vw - 32px));
+    background: #fff; border: 1px solid var(--line); border-radius: 12px;
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.15); padding: 14px 16px;
+    display: none; max-height: calc(100vh - 100px); overflow: auto;
+  }
+  .tasks-panel.show { display: block; }
+  .tasks-panel h3 { margin: 0 0 8px; font-size: 14px; }
+  .task { display: flex; gap: 8px; align-items: flex-start; font-size: 13px;
+    padding: 5px 0; line-height: 1.55; cursor: pointer; }
+  .task input { margin-top: 3px; }
+  .task .tag { color: var(--muted); font-size: 11px; }
+  .task input:checked + span { color: var(--muted); text-decoration: line-through; }
+  footer { padding: 0 24px 30px; color: var(--muted); font-size: 12px; }
+  .badge { display: none; background: #fee2e2; color: #b91c1c; border-radius: 6px;
+    padding: 2px 8px; font-size: 12px; font-weight: 600; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>🧪 AI Playground — 动手玩的神经网络</h1>
+  <p>配合本课程使用: 左边的「分类游乐场」对应第 02~04 课 (梯度下降 / 反向传播), 下面的「梯度下降实验」对应第 02 课。</p>
+  <div class="hdr-btns">
+    <button onclick="startTour()">📖 新手教程 (3 分钟)</button>
+    <button onclick="toggleTasks()">🎯 实验清单</button>
+  </div>
+</header>
+
+<div class="tabs">
+  <button class="tab-btn active" id="tabbtn-nn" onclick="showTab('nn')">🧠 神经网络分类</button>
+  <button class="tab-btn" id="tabbtn-gd" onclick="showTab('gd')">⛰️ 梯度下降实验</button>
+</div>
+
+<!-- ==================================================== Tab 1: NN -->
+<section class="panel" id="tab-nn">
+  <div class="col" style="width: 240px;">
+    <div class="card" id="card-data">
+      <h3>数据</h3>
+      <label class="row">数据集
+        <select id="dataset">
+          <option value="circle">圆环</option>
+          <option value="xor">异或</option>
+          <option value="moons">双月</option>
+          <option value="spiral" selected>螺旋</option>
+        </select>
+      </label>
+      <label class="row">噪声 <span id="noise-val">0.15</span></label>
+      <input type="range" id="noise" min="0" max="0.6" step="0.05" value="0.15" style="width:100%">
+    </div>
+
+    <div class="card" id="card-net">
+      <h3>网络</h3>
+      <label class="row">激活函数
+        <select id="activation">
+          <option value="tanh" selected>tanh</option>
+          <option value="relu">ReLU</option>
+          <option value="sigmoid">sigmoid</option>
+        </select>
+      </label>
+      <label class="row">学习率
+        <select id="lr">
+          <option>0.003</option>
+          <option>0.01</option>
+          <option selected>0.05</option>
+          <option>0.1</option>
+          <option>0.5</option>
+          <option>1.5</option>
+        </select>
+      </label>
+      <div style="margin-top:8px; display:flex; gap:6px;">
+        <button class="mini" onclick="addLayer()" title="加一层">＋层</button>
+        <button class="mini" onclick="removeLayer()" title="减一层">－层</button>
+      </div>
+      <div class="layers-box" id="layers-box" style="margin-top:8px;"></div>
+      <p class="note" style="margin:6px 0 0;">输入固定为 x₁, x₂; 输出为 1 个 tanh 神经元 (±1 分类, MSE 损失 —— 与第 04 课推导一致)。</p>
+    </div>
+
+    <div class="card" id="card-ctrl">
+      <h3>控制</h3>
+      <div class="btns">
+        <button class="act" id="btn-train" onclick="toggleTrain()">▶ 开始训练</button>
+        <button class="act secondary" onclick="stepN(1)">单步</button>
+        <button class="act warn" onclick="resetNet()">重置</button>
+      </div>
+      <div class="stats" style="margin-top:10px;">
+        训练步数 <b id="stat-steps">0</b><br>
+        损失 (MSE) <b id="stat-loss">—</b><br>
+        训练准确率 <b id="stat-acc">—</b>
+      </div>
+    </div>
+  </div>
+
+  <div class="col" style="flex:0 0 340px;">
+    <div class="card" id="card-netviz" style="align-self:stretch;">
+      <h3>网络与权重 <span style="font-weight:400">(线越粗 |w| 越大; 橙=正 蓝=负)</span></h3>
+      <canvas id="cv-net" width="316" height="330"></canvas>
+    </div>
+  </div>
+
+  <div class="col" style="flex:1 1 320px; min-width:300px;">
+    <div class="card" id="card-boundary">
+      <h3>决策边界 (实时)</h3>
+      <canvas id="cv-boundary" width="320" height="320"></canvas>
+      <div class="legend" style="margin-top:6px;">
+        <span><span class="dot" style="background:var(--orange)"></span>类 +1</span>
+        <span><span class="dot" style="background:var(--blue)"></span>类 −1</span>
+        <span>背景色 = 网络输出</span>
+      </div>
+    </div>
+    <div class="card" id="card-loss">
+      <h3>损失曲线</h3>
+      <canvas id="cv-loss" width="320" height="120"></canvas>
+    </div>
+  </div>
+</section>
+
+<!-- ==================================================== Tab 2: GD -->
+<section class="panel" id="tab-gd" style="display:none;">
+  <div class="col" style="width: 240px;">
+    <div class="card">
+      <h3>问题</h3>
+      <p class="note" style="margin:0;">
+        对固定数据 (y = 1.2x − 0.6 + 噪声) 做线性回归。
+        右图是损失 L(w,b) 的「势能面」: 越暗 = 越低。
+        ★ 是解析最优点, 线是梯度下降的轨迹。</p>
+    </div>
+    <div class="card">
+      <h3>优化器</h3>
+      <label class="row">学习率 <span id="gd-lr-val">0.3</span></label>
+      <input type="range" id="gd-lr" min="0.005" max="1.4" step="0.005" value="0.3" style="width:100%">
+      <label class="row" style="margin-top:4px;">动量 (β=0.9)
+        <input type="checkbox" id="gd-momentum">
+      </label>
+      <p class="note" style="margin:6px 0 0;">试试 lr=1.4: 无动量时沿 b 方向发散 (稳定性条件 lr < 2/λmax, 第 02 课 §4)。</p>
+    </div>
+    <div class="card">
+      <h3>控制</h3>
+      <div class="btns">
+        <button class="act" id="gd-btn" onclick="gdToggle()">▶ 开始</button>
+        <button class="act secondary" onclick="gdStep(1)">单步</button>
+        <button class="act warn" onclick="gdReset()">重置</button>
+      </div>
+      <div class="stats" style="margin-top:10px;">
+        步数 <b id="gd-steps">0</b><br>
+        w = <b id="gd-w">—</b> &nbsp; b = <b id="gd-b">—</b><br>
+        损失 L = <b id="gd-loss">—</b> <span class="badge" id="gd-div">已发散!</span>
+      </div>
+    </div>
+  </div>
+  <div class="col" style="flex:1 1 380px; min-width:340px;">
+    <div class="card">
+      <h3>损失曲面 (w, b) 与下降轨迹</h3>
+      <canvas id="cv-gd" width="460" height="380"></canvas>
+    </div>
+  </div>
+</section>
+
+<!-- ==================== 新手教程 & 实验清单 ==================== -->
+<div class="tour-mask" id="tour-mask" onclick="endTour()"></div>
+<div class="tour-card" id="tour-card" style="display:none">
+  <h3 id="tour-title"></h3>
+  <div class="body" id="tour-body"></div>
+  <div class="tour-foot">
+    <span class="tour-step" id="tour-progress"></span>
+    <span>
+      <button class="act secondary" id="tour-prev" onclick="tourPrev()">上一步</button>
+      <button class="act" id="tour-next" onclick="tourNext()">下一步</button>
+    </span>
+  </div>
+</div>
+
+<div class="tasks-panel" id="tasks-panel">
+  <h3>🎯 实验清单 <span id="tasks-progress" style="color:var(--muted);font-weight:400;font-size:12px;"></span></h3>
+  <div id="tasks-list"></div>
+  <p class="note" style="margin:8px 0 0;">勾选进度存在浏览器里; 全部勾完, 你就是第 04 课的毕业生。</p>
+</div>
+
+<footer>
+  建议玩法: ① 螺旋 + tanh + [4,4] 会不会失败? 加到 [8,8,8] 呢? &nbsp;
+  ② relu + 大学习率看损失爆炸 &nbsp; ③ 梯度下降页把 lr 拉到 1.4 看发散 ——
+  全部对应课件 <a href="../02_gradient_descent/README.md">02</a> / <a href="../04_neural_network/README.md">04</a> 课的知识点。
+  &nbsp;📐 想懂原理/数学/每行代码 → <a href="README.md">源码深读文档</a>。
+</footer>
+
+<script>
+"use strict";
+/* ============================================================
+   工具
+============================================================ */
+let _spare = null;
+function gaussian() {
+  if (_spare !== null) { const v = _spare; _spare = null; return v; }
+  let u, v, s;
+  do { u = Math.random() * 2 - 1; v = Math.random() * 2 - 1; s = u * u + v * v; }
+  while (s >= 1 || s === 0);
+  const m = Math.sqrt(-2 * Math.log(s) / s);
+  _spare = v * m;
+  return u * m;
+}
+const $ = (id) => document.getElementById(id);
+const ORANGE = [232, 135, 26], BLUE = [47, 111, 235];
+const DOMAIN = 5;                 // 数据坐标范围 [-5, 5]
+
+function showTab(t) {
+  $("tab-nn").style.display = t === "nn" ? "flex" : "none";
+  $("tab-gd").style.display = t === "gd" ? "flex" : "none";
+  $("tabbtn-nn").classList.toggle("active", t === "nn");
+  $("tabbtn-gd").classList.toggle("active", t === "gd");
+}
+
+/* ============================================================
+   数据集
+============================================================ */
+function genData(type, noise) {
+  const pts = [], N = 150;
+  for (let i = 0; i < N; i++) {
+    if (type === "circle") {
+      const inner = i < N / 2;
+      const r = inner ? Math.random() * 2.4 : 3.6 + Math.random() * 1.1;
+      const a = Math.random() * Math.PI * 2;
+      pts.push({ x: r * Math.cos(a) + gaussian() * noise,
+                 y: r * Math.sin(a) + gaussian() * noise, label: inner ? 1 : -1 });
+    } else if (type === "xor") {
+      let x = (Math.random() * 8 - 4), y = (Math.random() * 8 - 4);
+      if (Math.abs(x) < 0.4) x += x >= 0 ? 0.4 : -0.4;
+      if (Math.abs(y) < 0.4) y += y >= 0 ? 0.4 : -0.4;
+      pts.push({ x: x + gaussian() * noise, y: y + gaussian() * noise,
+                 label: x * y > 0 ? 1 : -1 });
+    } else if (type === "moons") {
+      const top = i < N / 2, a = Math.random() * Math.PI;
+      const x = top ? 3 * Math.cos(a) - 1.2 : 3 * Math.cos(a) + 1.2;
+      const y = top ? 3 * Math.sin(a) - 1.0 : -3 * Math.sin(a) + 1.0;
+      pts.push({ x: x + gaussian() * noise, y: y + gaussian() * noise,
+                 label: top ? 1 : -1 });
+    } else {                                   // spiral
+      const cls = i % 2, t = i / N;
+      const r = t * 4.5 + 0.3, a = 1.75 * t * 2 * Math.PI + cls * Math.PI;
+      pts.push({ x: r * Math.sin(a) + gaussian() * noise,
+                 y: r * Math.cos(a) + gaussian() * noise, label: cls ? 1 : -1 });
+    }
+  }
+  return pts;
+}
+
+/* ============================================================
+   神经网络引擎 (与 04_neural_network/mlp.py 同一套数学)
+============================================================ */
+let hidden = [4, 4];               // 每个隐藏层的神经元数
+
+function actF(name, z) {
+  if (name === "relu") return Math.max(0, z);
+  if (name === "sigmoid") return 1 / (1 + Math.exp(-z));
+  return Math.tanh(z);
+}
+function dActF(name, a) {          // 用激活值 a 表示的 φ'
+  if (name === "relu") return a > 0 ? 1 : 0;
+  if (name === "sigmoid") return a * (1 - a);
+  return 1 - a * a;                // tanh
+}
+
+function buildNet() {
+  const sizes = [2, ...hidden, 1];
+  const activation = $("activation").value;
+  const layers = [];
+  for (let l = 1; l < sizes.length; l++) {
+    const nIn = sizes[l - 1], nOut = sizes[l];
+    const scale = activation === "relu" ? Math.sqrt(2 / nIn) : Math.sqrt(1 / nIn);
+    const W = [], b = [];
+    for (let j = 0; j < nOut; j++) {
+      const row = [];
+      for (let i = 0; i < nIn; i++) row.push(gaussian() * scale);
+      W.push(row); b.push(0);
+    }
+    layers.push({ W, b });
+  }
+  return { sizes, layers };
+}
+
+function forward(net, x0, activation) {
+  const acts = [x0.slice()];
+  let a = x0;
+  for (let l = 0; l < net.layers.length; l++) {
+    const { W, b } = net.layers[l];
+    const out = [];
+    for (let j = 0; j < W.length; j++) {
+      let z = b[j];
+      for (let i = 0; i < W[j].length; i++) z += W[j][i] * a[i];
+      out.push(l === net.layers.length - 1 ? Math.tanh(z) : actF(activation, z));
+    }
+    acts.push(out);
+    a = out;
+  }
+  return acts;
+}
+
+function zeroGrads(net) {
+  return net.layers.map(({ W, b }) => ({
+    gW: W.map((row) => row.map(() => 0)),
+    gB: b.map(() => 0),
+  }));
+}
+
+// 一个 mini-batch 的 SGD; 返回该 batch 的 MSE
+function trainBatch(net, data, activation, lr) {
+  const B = 16;
+  const G = zeroGrads(net);
+  let lossSum = 0;
+  for (let s = 0; s < B; s++) {
+    const p = data[(Math.random() * data.length) | 0];
+    const acts = forward(net, [p.x, p.y], activation);
+    const out = acts[acts.length - 1][0];
+    const y = p.label;
+    lossSum += (out - y) * (out - y);
+    let delta = [2 * (out - y) * (1 - out * out)];   // 输出层: tanh' = 1 - a²
+    for (let l = net.layers.length - 1; l >= 0; l--) {
+      const aPrev = acts[l];
+      const { W } = net.layers[l];
+      for (let j = 0; j < W.length; j++) {
+        G[l].gB[j] += delta[j];
+        for (let i = 0; i < aPrev.length; i++) G[l].gW[j][i] += delta[j] * aPrev[i];
+      }
+      if (l > 0) {
+        const aCur = acts[l];
+        const da = new Array(aCur.length).fill(0);
+        for (let j = 0; j < W.length; j++)
+          for (let i = 0; i < aCur.length; i++) da[i] += delta[j] * W[j][i];
+        delta = da.map((g, i) => g * dActF(activation, aCur[i]));
+      }
+    }
+  }
+  for (let l = 0; l < net.layers.length; l++) {
+    const { W, b } = net.layers[l];
+    for (let j = 0; j < W.length; j++) {
+      b[j] -= lr * G[l].gB[j] / B;
+      for (let i = 0; i < W[j].length; i++) W[j][i] -= lr * G[l].gW[j][i] / B;
+    }
+  }
+  return lossSum / B;
+}
+
+function accuracy(net, data, activation) {
+  let c = 0;
+  for (const p of data) {
+    const out = forward(net, [p.x, p.y], activation)[net.layers.length][0];
+    if ((out > 0 ? 1 : -1) === p.label) c++;
+  }
+  return c / data.length;
+}
+
+/* ============================================================
+   Tab 1 状态与渲染
+============================================================ */
+let net = null, data = [], training = false;
+let steps = 0, emaLoss = null, lossHist = [];
+const gridN = 46;
+const off = document.createElement("canvas");
+off.width = gridN; off.height = gridN;
+const offCtx = off.getContext("2d");
+
+  function fullReset(keepData) {
+  net = buildNet();
+  steps = 0; emaLoss = null; lossHist = [];
+  if (!keepData) data = genData($("dataset").value, parseFloat($("noise").value));
+  $("stat-steps").textContent = "0";
+  $("stat-loss").textContent = "—";
+  $("stat-acc").textContent = (accuracy(net, data, $("activation").value) * 100).toFixed(1) + "%";
+  renderAll();
+}
+
+function addLayer() {
+  if (hidden.length >= 4) return;
+  hidden.push(4);
+  renderLayerRows(); fullReset(true);
+}
+function removeLayer() {
+  if (hidden.length <= 1) return;
+  hidden.pop();
+  renderLayerRows(); fullReset(true);
+}
+function changeNeurons(idx, d) {
+  hidden[idx] = Math.min(8, Math.max(1, hidden[idx] + d));
+  renderLayerRows(); fullReset(true);
+}
+function renderLayerRows() {
+  const box = $("layers-box");
+  box.innerHTML = "";
+  hidden.forEach((n, i) => {
+    const row = document.createElement("div");
+    row.className = "layer-row";
+    const name = document.createElement("span");
+    name.className = "name";
+    name.textContent = `隐藏层 ${i + 1}`;
+    const minus = document.createElement("button");
+    minus.className = "mini"; minus.textContent = "−";
+    minus.onclick = () => changeNeurons(i, -1);
+    const count = document.createElement("span");
+    count.textContent = `${n} 个神经元`;
+    const plus = document.createElement("button");
+    plus.className = "mini"; plus.textContent = "＋";
+    plus.onclick = () => changeNeurons(i, 1);
+    row.append(name, minus, count, plus);
+    box.append(row);
+  });
+}
+
+function toggleTrain() {
+  training = !training;
+  $("btn-train").textContent = training ? "⏸ 暂停" : "▶ 开始训练";
+}
+
+function stepN(k) {
+  const activation = $("activation").value;
+  const lr = parseFloat($("lr").value);
+  for (let i = 0; i < k; i++) {
+    const loss = trainBatch(net, data, activation, lr);
+    steps++;
+    emaLoss = emaLoss === null ? loss : emaLoss * 0.95 + loss * 0.05;
+    lossHist.push(emaLoss);
+    if (lossHist.length > 600) lossHist.splice(0, lossHist.length - 600);
+  }
+  $("stat-steps").textContent = steps;
+  $("stat-loss").textContent = emaLoss.toFixed(4);
+  $("stat-acc").textContent = (accuracy(net, data, activation) * 100).toFixed(1) + "%";
+  renderAll();
+}
+
+function renderAll() { renderBoundary(); renderNet(); renderLoss(); }
+
+function renderBoundary() {
+  const activation = $("activation").value;
+  const img = offCtx.createImageData(gridN, gridN);
+  for (let gy = 0; gy < gridN; gy++) {
+    for (let gx = 0; gx < gridN; gx++) {
+      const x = gx / (gridN - 1) * 2 * DOMAIN - DOMAIN;
+      const y = DOMAIN - gy / (gridN - 1) * 2 * DOMAIN;
+      const v = forward(net, [x, y], activation)[net.layers.length][0];
+      const idx = (gy * gridN + gx) * 4;
+      const c = v >= 0 ? ORANGE : BLUE;
+      img.data[idx] = c[0]; img.data[idx + 1] = c[1]; img.data[idx + 2] = c[2];
+      img.data[idx + 3] = Math.min(255, Math.abs(v) * 200 + 8);
+    }
+  }
+  offCtx.putImageData(img, 0, 0);
+  const cv = $("cv-boundary"), ctx = cv.getContext("2d");
+  ctx.imageSmoothingEnabled = true;
+  ctx.clearRect(0, 0, cv.width, cv.height);
+  ctx.drawImage(off, 0, 0, cv.width, cv.height);
+  // 数据点
+  const px = (x) => (x + DOMAIN) / (2 * DOMAIN) * cv.width;
+  const py = (y) => (DOMAIN - y) / (2 * DOMAIN) * cv.height;
+  for (const p of data) {
+    ctx.beginPath();
+    ctx.arc(px(p.x), py(p.y), 3.4, 0, Math.PI * 2);
+    ctx.fillStyle = p.label > 0 ? "rgba(232,135,26,0.95)" : "rgba(47,111,235,0.95)";
+    ctx.fill();
+    ctx.lineWidth = 0.8;
+    ctx.strokeStyle = "rgba(0,0,0,0.55)";
+    ctx.stroke();
+  }
+}
+
+function renderNet() {
+  const cv = $("cv-net"), ctx = cv.getContext("2d");
+  ctx.clearRect(0, 0, cv.width, cv.height);
+  const cols = net.sizes.length;
+  const colX = (l) => 40 + l * (cv.width - 80) / (cols - 1);
+  const nodeY = (l, i) => {
+    const n = net.sizes[l];
+    const gap = Math.min(42, (cv.height - 60) / Math.max(n, 1));
+    return cv.height / 2 + (i - (n - 1) / 2) * gap;
+  };
+  // 边
+  for (let l = 0; l < net.layers.length; l++) {
+    const { W } = net.layers[l];
+    for (let j = 0; j < W.length; j++) {
+      for (let i = 0; i < W[j].length; i++) {
+        const w = W[j][i];
+        ctx.beginPath();
+        ctx.moveTo(colX(l), nodeY(l, i));
+        ctx.lineTo(colX(l + 1), nodeY(l + 1, j));
+        ctx.lineWidth = Math.min(5, 0.5 + Math.abs(w) * 2.2);
+        ctx.strokeStyle = w >= 0
+          ? "rgba(232,135,26,0.65)" : "rgba(47,111,235,0.65)";
+        ctx.stroke();
+      }
+    }
+  }
+  // 节点
+  const labels = [["x₁", "x₂"]];
+  for (let l = 1; l < cols; l++) {
+    const arr = [];
+    for (let i = 0; i < net.sizes[l]; i++) arr.push("");
+    labels.push(arr);
+  }
+  labels[cols - 1][0] = "ŷ";
+  for (let l = 0; l < cols; l++) {
+    for (let i = 0; i < net.sizes[l]; i++) {
+      ctx.beginPath();
+      ctx.arc(colX(l), nodeY(l, i), 11, 0, Math.PI * 2);
+      ctx.fillStyle = "#fff";
+      ctx.fill();
+      ctx.lineWidth = 1.4;
+      ctx.strokeStyle = "#4b5563";
+      ctx.stroke();
+      const lab = labels[l][i];
+      if (lab) {
+        ctx.fillStyle = "#111";
+        ctx.font = "12px sans-serif";
+        ctx.textAlign = "center";
+        ctx.fillText(lab, colX(l), nodeY(l, i) + 4);
+      }
+    }
+  }
+}
+
+function renderLoss() {
+  const cv = $("cv-loss"), ctx = cv.getContext("2d");
+  ctx.clearRect(0, 0, cv.width, cv.height);
+  if (lossHist.length < 2) return;
+  const max = Math.max(...lossHist) * 1.1 + 1e-9;
+  ctx.beginPath();
+  lossHist.forEach((v, i) => {
+    const x = i / (lossHist.length - 1) * cv.width;
+    const y = cv.height - v / max * (cv.height - 8) - 4;
+    i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+  });
+  ctx.strokeStyle = "#2f6feb";
+  ctx.lineWidth = 1.6;
+  ctx.stroke();
+  ctx.fillStyle = "#6b7280";
+  ctx.font = "10px sans-serif";
+  ctx.fillText("0", 2, cv.height - 2);
+  ctx.fillText(max.toFixed(2), 2, 10);
+}
+
+/* ============================================================
+   Tab 2: 梯度下降实验
+============================================================ */
+const GD = { xs: [], ys: [], path: [], v: [0, 0], steps: 0, running: false,
+             diverged: false, W: [-0.6, -1.4] };
+(function makeGDData() {
+  for (let i = 0; i < 40; i++) {
+    const x = -1 + 2 * i / 39;   // x∈[-1,1] (第02课同款): λmax=2 → 稳定上界 lr<1
+    GD.xs.push(x);
+    GD.ys.push(1.2 * x - 0.6 + gaussian() * 0.15);
+  }
+})();
+
+function gdLoss(w, b) {
+  let s = 0;
+  for (let i = 0; i < GD.xs.length; i++)
+    s += (w * GD.xs[i] + b - GD.ys[i]) ** 2;
+  return s / GD.xs.length;
+}
+function gdGrad(w, b) {
+  let gw = 0, gb = 0;
+  for (let i = 0; i < GD.xs.length; i++) {
+    const e = w * GD.xs[i] + b - GD.ys[i];
+    gw += e * GD.xs[i]; gb += e;
+  }
+  return [2 * gw / GD.xs.length, 2 * gb / GD.xs.length];
+}
+
+function gdStep(k) {
+  const lr = parseFloat($("gd-lr").value);
+  const mom = $("gd-momentum").checked ? 0.9 : 0;
+  for (let i = 0; i < k; i++) {
+    const g = gdGrad(GD.W[0], GD.W[1]);
+    GD.v[0] = mom * GD.v[0] - lr * g[0];
+    GD.v[1] = mom * GD.v[1] - lr * g[1];
+    GD.W[0] += GD.v[0]; GD.W[1] += GD.v[1];
+    GD.steps++;
+    GD.path.push([GD.W[0], GD.W[1]]);
+    if (Math.abs(GD.W[0]) > 50 || Math.abs(GD.W[1]) > 50 || !isFinite(GD.W[0])) {
+      GD.diverged = true;
+      GD.running = false;
+      $("gd-btn").textContent = "▶ 开始";
+      break;
+    }
+  }
+  const L = gdLoss(GD.W[0], GD.W[1]);
+  $("gd-steps").textContent = GD.steps;
+  $("gd-w").textContent = GD.W[0].toFixed(3);
+  $("gd-b").textContent = GD.W[1].toFixed(3);
+  $("gd-loss").textContent = isFinite(L) ? L.toFixed(4) : "∞";
+  $("gd-div").style.display = GD.diverged ? "inline-block" : "none";
+  renderGD();
+}
+
+function gdToggle() {
+  GD.running = !GD.running;
+  $("gd-btn").textContent = GD.running ? "⏸ 暂停" : "▶ 开始";
+}
+function gdReset() {
+  GD.W = [-0.6, -1.4]; GD.v = [0, 0];
+  GD.steps = 0; GD.path = [[GD.W[0], GD.W[1]]]; GD.diverged = false;
+  $("gd-btn").textContent = "▶ 开始"; GD.running = false;
+  $("gd-steps").textContent = "0";
+  $("gd-div").style.display = "none";
+  renderGD();
+}
+
+function renderGD() {
+  const cv = $("cv-gd"), ctx = cv.getContext("2d");
+  const Wmin = -0.5, Wmax = 2.5, Bmin = -1.5, Bmax = 1.5;
+  const N = 140;
+  // 预计算损失范围 (对数尺度上色)
+  const surf = [];
+  let lo = Infinity, hi = -Infinity;
+  for (let gy = 0; gy < N; gy++) {
+    surf.push([]);
+    for (let gx = 0; gx < N; gx++) {
+      const w = Wmin + (Wmax - Wmin) * gx / (N - 1);
+      const b = Bmax - (Bmax - Bmin) * gy / (N - 1);
+      const L = Math.min(gdLoss(w, b), 30);
+      surf[gy].push(Math.log(1 + L));
+      lo = Math.min(lo, surf[gy][gx]); hi = Math.max(hi, surf[gy][gx]);
+    }
+  }
+  const img = ctx.createImageData(N, N);
+  for (let gy = 0; gy < N; gy++) {
+    for (let gx = 0; gx < N; gx++) {
+      const t = (surf[gy][gx] - lo) / (hi - lo);
+      const idx = (gy * N + gx) * 4;
+      img.data[idx] = 250 - t * 205;      // 亮 (低损失) → 暗蓝 (高)
+      img.data[idx + 1] = 250 - t * 150;
+      img.data[idx + 2] = 255 - t * 40;
+      img.data[idx + 3] = 255;
+    }
+  }
+  const offG = document.createElement("canvas");
+  offG.width = N; offG.height = N;
+  offG.getContext("2d").putImageData(img, 0, 0);
+  ctx.imageSmoothingEnabled = true;
+  ctx.clearRect(0, 0, cv.width, cv.height);
+  ctx.drawImage(offG, 0, 0, cv.width, cv.height);
+
+  const px = (w) => (w - Wmin) / (Wmax - Wmin) * cv.width;
+  const py = (b) => (Bmax - b) / (Bmax - Bmin) * cv.height;
+  // 解析最优点
+  let sx = 0, sy = 0, sxx = 0, sxy = 0;
+  for (let i = 0; i < GD.xs.length; i++) {
+    sx += GD.xs[i]; sy += GD.ys[i]; sxx += GD.xs[i] ** 2; sxy += GD.xs[i] * GD.ys[i];
+  }
+  const n = GD.xs.length;
+  const wStar = (n * sxy - sx * sy) / (n * sxx - sx * sx);
+  const bStar = (sy - wStar * sx) / n;
+  ctx.beginPath();
+  ctx.moveTo(px(wStar), py(bStar) - 9);
+  ctx.lineTo(px(wStar) + 8, py(bStar) + 6);
+  ctx.lineTo(px(wStar) - 8, py(bStar) + 6);
+  ctx.closePath();
+  ctx.fillStyle = "#111";
+  ctx.fill();
+  // 轨迹
+  if (GD.path.length > 1) {
+    ctx.beginPath();
+    GD.path.forEach(([w, b], i) => {
+      i === 0 ? ctx.moveTo(px(w), py(b)) : ctx.lineTo(px(w), py(b));
+    });
+    ctx.strokeStyle = "rgba(220,20,60,0.9)";
+    ctx.lineWidth = 1.6;
+    ctx.stroke();
+  }
+  // 当前点
+  ctx.beginPath();
+  ctx.arc(px(GD.W[0]), py(GD.W[1]), 5.5, 0, Math.PI * 2);
+  ctx.fillStyle = "#dc143c";
+  ctx.fill();
+  ctx.strokeStyle = "#fff";
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+  // 轴标签
+  ctx.fillStyle = "#374151";
+  ctx.font = "11px sans-serif";
+  ctx.fillText(`w (${Wmin}~${Wmax}) →`, 8, cv.height - 8);
+  ctx.save();
+  ctx.translate(12, cv.height - 10);
+  ctx.rotate(-Math.PI / 2);
+  ctx.fillText(`b (${Bmin}~${Bmax}) →`, 0, 0);
+  ctx.restore();
+}
+
+/* ============================================================
+   主循环与事件
+============================================================ */
+function frame() {
+  if (training) stepN(12);
+  if (GD.running) gdStep(3);
+  requestAnimationFrame(frame);
+}
+
+$("dataset").addEventListener("change", () => fullReset(false));
+$("noise").addEventListener("input", () => {
+  $("noise-val").textContent = parseFloat($("noise").value).toFixed(2);
+});
+$("noise").addEventListener("change", () => fullReset(false));
+$("activation").addEventListener("change", () => fullReset(true));
+$("lr").addEventListener("change", () => {});
+$("gd-lr").addEventListener("input", () => {
+  $("gd-lr-val").textContent = parseFloat($("gd-lr").value).toFixed(3);
+});
+
+/* ============================================================
+   新手教程 (分步引导, 高亮对应面板)
+============================================================ */
+const TOUR = [
+  { t: "👋 欢迎", sel: null,
+    h: `这是一个<b>跑在你浏览器里</b>的神经网络 —— 不用装任何东西。<br>接下来 3 分钟, 带你把它玩明白。本页所有数学与 <a href="../04_neural_network/README.md" target="_blank">第 04 课</a> 的手写 NumPy 网络完全一致。` },
+  { t: "① 数据 (左上)", sel: "#card-data",
+    h: `四种数据集, <b>螺旋</b>是全场最难。噪声滑块往右拉, 数据点会更散。<br>现在保持默认: 螺旋 / 0.15。` },
+  { t: "② 网络 (左中)", sel: "#card-net",
+    h: `激活函数、学习率, 以及 <code>＋层/－层</code> 和每层神经元的 <code>±</code>。<br>结构: 输入 x₁, x₂ → 若干隐藏层 → 1 个 tanh 输出神经元 (±1 分类, MSE 损失)。` },
+  { t: "③ 控制 (左下)", sel: "#card-ctrl",
+    h: `<b>▶开始训练</b> (再点一次 = 暂停); <b>单步</b> = 慢动作看每一步; <b>重置</b> = 重新随机初始化 (换一次"出身")。` },
+  { t: "④ 网络图 (中间)", sel: "#card-netviz",
+    h: `每条线是一个权重: <b>越粗 |w| 越大; 橙 = 正, 蓝 = 负</b>。训练时你能亲眼看到权重在"生长"。` },
+  { t: "⑤ 决策边界 + 损失 (右侧)", sel: "#card-boundary",
+    h: `背景色 = 网络当前输出 (橙正蓝负); 损失曲线下降 = 它在学习。<br>读数: 训练步数 / 损失 / 训练准确率。` },
+  { t: "🧪 实验 1: 先失败一次", sel: "#card-ctrl",
+    h: `保持默认 (螺旋 + [4,4] + tanh + lr 0.05), 点 <b>▶开始训练</b>, 观察 10 秒:<br>准确率会卡在 60% 附近, 边界怎么扭都切不开三条臂。<br>—— 不是你操作错了, 是<b>网络容量不够</b> (第 04 课 §1)。` },
+  { t: "🧪 实验 2: 加容量", sel: "#card-net",
+    h: `暂停 → 点 <code>＋</code> 把两层都加到 8 个神经元 (或再 <code>＋层</code>) → <b>重置</b> → 再训练。<br>看边界一点点「缠」上螺旋, 准确率冲上 90%。` },
+  { t: "🧪 实验 3: 把学习率拉爆", sel: "#card-net",
+    h: `学习率切到 <b>1.5</b> → 重置 → 训练。<br>损失曲线上天 = 发散。这就是第 02 课的稳定性条件 <code>lr &lt; 2/λmax</code>。` },
+  { t: "🧪 实验 4: 去隔壁滚石头", sel: "#tabbtn-gd",
+    h: `切到上方 <b>「⛰️ 梯度下降实验」</b>标签: 在损失曲面上滚石头。<br>lr=0.3 稳稳收敛; lr=1.4 发散; lr=1.4 + 勾选「动量」居然又能稳住 —— 惯性把振荡平均掉了 (第 02 课 §6)。` },
+  { t: "🧪 实验 5: 换地图 + 抽卡", sel: "#card-data",
+    h: `换数据集玩 (异或/圆环/双月); 同一设置多按几次 <b>重置</b> 再训 —— 有时快、有时卡住, 这叫初始化的彩票。学完第 05 课你就知道为什么。` },
+  { t: "🎓 之后呢", sel: null,
+    h: `每个现象背后的公式都在课程 README 里: <a href="../02_gradient_descent/README.md" target="_blank">02 梯度下降</a> · <a href="../04_neural_network/README.md" target="_blank">04 反向传播</a>。<br>右上角 <b>🎯 实验清单</b> 是你的毕业任务; 卡住就回 ZCode 会话问我。` },
+];
+let tourIdx = -1, tourPrevSel = null;
+
+function startTour() {
+  tourIdx = 0;
+  $("tour-card").style.display = "block";
+  $("tour-mask").classList.add("show");
+  showTourStep();
+}
+function endTour() {
+  tourIdx = -1;
+  $("tour-card").style.display = "none";
+  $("tour-mask").classList.remove("show");
+  clearHl();
+  try { localStorage.setItem("aiplay_seen_v1", "1"); } catch (e) { /* 无痕模式等 */ }
+}
+function clearHl() {
+  if (tourPrevSel) {
+    const el = document.querySelector(tourPrevSel);
+    if (el) el.classList.remove("tour-hl");
+    tourPrevSel = null;
+  }
+}
+function showTourStep() {
+  const s = TOUR[tourIdx];
+  $("tour-title").textContent = s.t;
+  $("tour-body").innerHTML = s.h;
+  $("tour-progress").textContent = (tourIdx + 1) + " / " + TOUR.length;
+  $("tour-prev").style.visibility = tourIdx === 0 ? "hidden" : "visible";
+  $("tour-next").textContent = tourIdx === TOUR.length - 1 ? "完成 ✓" : "下一步";
+  clearHl();
+  if (s.sel) {
+    const el = document.querySelector(s.sel);
+    if (el) {
+      el.scrollIntoView({ block: "center", behavior: "smooth" });
+      el.classList.add("tour-hl");
+      tourPrevSel = s.sel;
+    }
+  } else {
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }
+}
+function tourNext() {
+  if (tourIdx >= TOUR.length - 1) { endTour(); return; }
+  tourIdx += 1;
+  showTourStep();
+}
+function tourPrev() {
+  if (tourIdx > 0) { tourIdx -= 1; showTourStep(); }
+}
+
+/* ============================================================
+   实验清单 (勾选进度存在 localStorage)
+============================================================ */
+const TASKS = [
+  { id: "t1", tag: "第02课", text: "梯度下降页: lr=0.3, 看损失收敛到噪声水平 (≈0.02)" },
+  { id: "t2", tag: "第02课", text: "梯度下降页: lr=1.4, 亲眼看到「已发散」徽章" },
+  { id: "t3", tag: "第02课", text: "勾上动量后重试 lr=1.4 —— 不再发散" },
+  { id: "t4", tag: "第04课", text: "螺旋 + [4,4]: 训 200 步, 准确率仍 &lt; 70% (容量不足)" },
+  { id: "t5", tag: "第04课", text: "加大容量后, 让螺旋准确率 &gt; 90%" },
+  { id: "t6", tag: "第04课", text: "lr=1.5: 亲眼看到损失爆炸" },
+  { id: "t7", tag: "第04课", text: "换 ReLU 重训一次, 和 tanh 比收敛速度" },
+  { id: "t8", tag: "挑战", text: "圆环 + 噪声 0.4: 找一套能上 85% 的网络配置" },
+];
+function loadTasks() {
+  try { return JSON.parse(localStorage.getItem("aiplay_tasks_v1") || "{}"); }
+  catch (e) { return {}; }
+}
+function renderTasks() {
+  const done = loadTasks();
+  const box = $("tasks-list");
+  box.innerHTML = "";
+  for (const task of TASKS) {
+    const row = document.createElement("label");
+    row.className = "task";
+    const cb = document.createElement("input");
+    cb.type = "checkbox";
+    cb.checked = !!done[task.id];
+    cb.onchange = () => {
+      const d = loadTasks();
+      d[task.id] = cb.checked;
+      try { localStorage.setItem("aiplay_tasks_v1", JSON.stringify(d)); } catch (e) { /* 忽略 */ }
+      updateProgress();
+    };
+    const span = document.createElement("span");
+    span.innerHTML = `<span class="tag">[${task.tag}]</span> ` + task.text;
+    row.append(cb, span);
+    box.append(row);
+  }
+  updateProgress();
+}
+function updateProgress() {
+  const done = loadTasks();
+  const n = TASKS.filter((t) => done[t.id]).length;
+  $("tasks-progress").textContent = `已完成 ${n}/${TASKS.length}`;
+}
+function toggleTasks() {
+  const p = $("tasks-panel");
+  p.classList.toggle("show");
+  if (p.classList.contains("show")) renderTasks();
+}
+
+renderLayerRows();
+fullReset(false);
+gdReset();
+requestAnimationFrame(frame);
+
+// 首次访问自动弹出新手教程
+try { if (!localStorage.getItem("aiplay_seen_v1")) { startTour(); } } catch (e) { /* 忽略 */ }
+</script>
+</body>
+</html>
