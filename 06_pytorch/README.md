@@ -1,5 +1,8 @@
 # 第 06 课 · PyTorch 入门 — 你的 micrograd, 工业级版本
 
+> 🌐 配套互动网页：[06_pytorch.html](../pages/06_pytorch.html)（讲解精华 + 可玩 demo，无需任何安装）
+
+
 > PyTorch = 你已经会的东西的工业级实现：
 > **NumPy 的张量 API + 第 5 课的自动微分引擎（张量版）+ GPU/MPS 加速 + 现成的神经网络积木**。
 > 本课结束后，你写的每一行 PyTorch 都能对应到前 5 课的某个公式。

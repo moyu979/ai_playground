@@ -1,5 +1,8 @@
 # 第 10 课 · Transformer — 组装你自己的 GPT
 
+> 🌐 配套互动网页：[10_transformer.html](../pages/10_transformer.html)（讲解精华 + 可玩 demo，无需任何安装）
+
+
 > 十课旅程的终点，也是现代 AI 的起点。你将亲手写出 nanoGPT 风格的完整模型，
 > 在莎士比亚语料上训练，然后看着它吐出"伪莎士比亚"。
 > 这份 `model.py` 与 GPT-2 的唯一区别是**尺寸**——结构上每一个部件都一样。

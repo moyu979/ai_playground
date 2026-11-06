@@ -1,7 +1,11 @@
 # AI Playground — 从零到 Transformer 的动手学习之路
 
+![AI Playground 课程封面](cover.png)
+
 > 为有 **物理 + 传统 CS 背景** 的学习者定制的深度学习入门课程。
 > 每一课都可以运行、修改、玩坏、修好。终点：**亲手写一个字符级 GPT，在你的 Mac 上训练并让它写莎士比亚**。
+>
+> 🌐 **[课程网站首页](index.html)**（路线图 + 进度打卡）· 每课配有 [互动网页版](pages/01_numpy.html)（讲解精华 + 可玩 demo）
 
 ## 设计哲学
 
@@ -24,16 +28,16 @@
 按顺序学习。每课先读 `README.md`（推导 + 图解），再运行/修改代码，最后做练习。
 
 - [ ] **[00_setup](00_setup/)** — 环境搭建与自检（~30 min）
-- [ ] **[01_numpy](01_numpy/)** — NumPy 速成：向量化思维、广播、einsum（~2 h）
-- [ ] **[02_gradient_descent](02_gradient_descent/)** — 线性回归与梯度下降：损失曲面、学习率（~2 h）
-- [ ] **[03_logistic_regression](03_logistic_regression/)** — 逻辑回归：sigmoid、交叉熵、softmax（~2 h）
-- [ ] **[04_neural_network](04_neural_network/)** — 纯 NumPy 神经网络 + 反向传播完整推导（~5 h，全程最重要的一课）
-- [ ] **[05_autograd](05_autograd/)** — 手写 micrograd：标量级自动微分引擎（~4 h）
-- [ ] **[06_pytorch](06_pytorch/)** — PyTorch 入门：用 30 行重写第 4 课的 150 行（~3 h）
-- [ ] **[07_cnn](07_cnn/)** — 卷积神经网络：MNIST 99%（~4 h）
-- [ ] **[08_sequence_models](08_sequence_models/)** — 语言建模：bigram → MLP → RNN，梯度消失（~4 h）
-- [ ] **[09_attention](09_attention/)** — 注意力：QKV、scaled dot-product、因果掩码（~4 h）
-- [ ] **[10_transformer](10_transformer/)** — 组装 GPT（nanoGPT 风格）并训练（~6 h）
+- [ ] **[01_numpy](01_numpy/)** — NumPy 速成：向量化思维、广播、einsum（~2 h）· 🌐 [互动页](pages/01_numpy.html)
+- [ ] **[02_gradient_descent](02_gradient_descent/)** — 线性回归与梯度下降：损失曲面、学习率（~2 h）· 🌐 [互动页](pages/02_gd.html)
+- [ ] **[03_logistic_regression](03_logistic_regression/)** — 逻辑回归：sigmoid、交叉熵、softmax（~2 h）· 🌐 [互动页](pages/03_sigmoid.html)
+- [ ] **[04_neural_network](04_neural_network/)** — 纯 NumPy 神经网络 + 反向传播完整推导（~5 h，全程最重要的一课）· 🌐 [互动页](pages/04_mlp.html)
+- [ ] **[05_autograd](05_autograd/)** — 手写 micrograd：标量级自动微分引擎（~4 h）· 🌐 [互动页](pages/05_autograd.html)
+- [ ] **[06_pytorch](06_pytorch/)** — PyTorch 入门：用 30 行重写第 4 课的 150 行（~3 h）· 🌐 [互动页](pages/06_pytorch.html)
+- [ ] **[07_cnn](07_cnn/)** — 卷积神经网络：MNIST 99%（~4 h）· 🌐 [互动页](pages/07_cnn.html)
+- [ ] **[08_sequence_models](08_sequence_models/)** — 语言建模：bigram → MLP → RNN，梯度消失（~4 h）· 🌐 [互动页](pages/08_lm.html)
+- [ ] **[09_attention](09_attention/)** — 注意力：QKV、scaled dot-product、因果掩码（~4 h）· 🌐 [互动页](pages/09_attention.html)
+- [ ] **[10_transformer](10_transformer/)** — 组装 GPT（nanoGPT 风格）并训练（~6 h）· 🌐 [互动页](pages/10_transformer.html)
 - [ ] **[playground](playground/)** — 随时打开的网页版神经网络游乐场（配合 02~04 课）；
       双击 **`启动Playground.command`** 一键启动+开浏览器，或直接双击 `playground/index.html`（无需服务器）。
       想懂它的原理/数学/每行代码 → [playground/README.md](playground/README.md)

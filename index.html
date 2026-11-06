@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AI Playground · 课程首页</title>
+<style>
+  :root{--orange:#e8871a;--blue:#4a8df0;--green:#3fbf7f;--ink:#1f2430;--muted:#6b7280;
+        --bg:#f7f7f9;--card:#fff;--line:#e5e7eb}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);
+       font-family:"PingFang SC","Hiragino Sans GB","Microsoft YaHei",system-ui,sans-serif}
+  .hero{background:linear-gradient(135deg,#0d1220 0%,#1a2440 100%);color:#e8ecf4;
+        padding:44px 30px 38px}
+  .hero h1{margin:0;font-size:32px}
+  .hero p.sub{margin:10px 0 0;color:#8a93a6;font-size:15px;max-width:760px;line-height:1.7}
+  .chips{display:flex;gap:10px;margin-top:18px;flex-wrap:wrap}
+  .chip{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.15);
+        border-radius:20px;padding:5px 14px;font-size:12.5px;color:#b9c2d4}
+  .hero .btns{margin-top:20px;display:flex;gap:10px;flex-wrap:wrap}
+  .hero a.btn,.hero button{display:inline-block;border:none;border-radius:9px;padding:9px 18px;
+        font-size:14px;font-weight:600;cursor:pointer;text-decoration:none}
+  .a-orange{background:var(--orange);color:#fff}
+  .a-blue{background:var(--blue);color:#fff}
+  .a-ghost{background:rgba(255,255,255,.1);color:#e8ecf4;border:1px solid rgba(255,255,255,.2)!important}
+  main{max-width:1080px;margin:0 auto;padding:10px 24px 40px}
+  .progress-card{background:var(--card);border:1px solid var(--line);border-radius:12px;
+                 padding:14px 18px;margin-top:-26px;box-shadow:0 8px 30px rgba(0,0,0,.06);
+                 display:flex;align-items:center;gap:14px;font-size:13.5px}
+  .bar{flex:1;height:8px;background:#e9edf3;border-radius:6px;overflow:hidden}
+  .bar>div{height:100%;background:linear-gradient(90deg,var(--blue),var(--green));width:0%}
+  h2.sec{margin:30px 4px 12px;font-size:19px}
+  .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:14px}
+  .lcard{background:var(--card);border:1px solid var(--line);border-radius:12px;
+         padding:14px 16px;display:flex;gap:13px}
+  .lcard.done{border-color:var(--green);background:#f4fbf7}
+  .lnum{font-size:22px;font-weight:700;color:#c9d2e0;min-width:34px}
+  .lcard.done .lnum{color:var(--green)}
+  .lcard h3{margin:0 0 4px;font-size:15px}
+  .lcard p{margin:0 0 8px;font-size:12.5px;color:var(--muted);line-height:1.6}
+  .llinks{display:flex;gap:12px;align-items:center;font-size:12.5px;flex-wrap:wrap}
+  .llinks a{color:var(--blue);text-decoration:none}
+  .llinks label{color:var(--muted);display:flex;gap:4px;align-items:center;cursor:pointer}
+  .big{background:linear-gradient(135deg,#fff8ef,#fff);border:1px solid #f0d9b8;
+       border-radius:14px;padding:20px 22px;margin-top:14px}
+  .big h3{margin:0 0 6px;font-size:16px}
+  .big p{font-size:13.5px;color:var(--muted);line-height:1.7;margin:4px 0 10px}
+  .term{background:#0d1220;color:#9fe0b8;border-radius:10px;padding:12px 16px;
+        font-family:ui-monospace,Menlo,monospace;font-size:12.5px;line-height:1.7;overflow:auto}
+  footer{max-width:1080px;margin:0 auto;padding:16px 24px 40px;color:var(--muted);font-size:12.5px}
+  footer a{color:var(--blue)}
+</style>
+</head>
+<body>
+
+<div class="hero">
+  <h1>🧪 AI Playground</h1>
+  <p class="sub">为物理 + CS 背景写的中深度学习动手课程：先造轮子（纯 NumPy 手写反向传播、自动微分引擎），
+     再用 PyTorch 造真的（CNN → RNN → 注意力 → 训练你自己的字符级 GPT）。每一课都能跑、能改、能玩坏、能修好。</p>
+  <div class="chips">
+    <span class="chip">📚 11 课</span><span class="chip">🧪 30+ 可运行脚本</span>
+    <span class="chip">📝 自动判分练习 + 参考答案</span><span class="chip">🤖 0.8M 参数字符级 GPT（ppl 6.0）</span>
+    <span class="chip">⚖️ 每个优势都配反面教材</span>
+  </div>
+  <div class="btns">
+    <a class="btn a-orange" href="playground/index.html">🧪 打开网页 Playground</a>
+    <a class="btn a-blue" href="#roadmap">从第 01 课开始</a>
+    <a class="btn a-ghost" href="https://github.com/moyu979/ai_playground">⭐ GitHub</a>
+  </div>
+</div>
+
+<main>
+  <div class="progress-card">
+    <b>学习进度</b>
+    <div class="bar"><div id="bar"></div></div>
+    <span id="prog-text">0 / 10</span>
+    <button class="sec" style="background:#eef1f6;color:var(--ink)" onclick="resetProgress()">清零</button>
+  </div>
+
+  <h2 class="sec" id="roadmap">🗺️ 学习路线图 <span style="font-size:12.5px;color:var(--muted);font-weight:400">（勾选进度存在浏览器里）</span></h2>
+  <div class="grid" id="lessons"></div>
+
+  <div class="big">
+    <h3>🧪 网页 Playground —— 第 04 课的实战场（可先玩再学）</h3>
+    <p>单文件网页，内置 12 步新手教程 + 8 个毕业任务。在浏览器里训练一个真神经网络：
+       看它先在螺旋上失败（容量不足），加容量后翻盘；把学习率拉爆；去梯度下降页滚石头。</p>
+    <a class="btn a-orange" href="playground/index.html">▶ 打开 Playground</a>
+    <a class="btn sec" style="background:#eef1f6;color:var(--ink)" href="playground/README.md">📐 源码深读（原理/数学/每行代码）</a>
+  </div>
+
+  <h2 class="sec">⚡ 快速开始</h2>
+  <div class="term">
+# 环境已配好 (conda env: aiplay, python 3.12, 勿动 base)<br>
+conda activate aiplay<br>
+python 00_setup/check_env.py&nbsp;&nbsp;&nbsp;&nbsp;# 自检 numpy / matplotlib / torch / MPS<br><br>
+# 逐课学习: 先读 README → 跑脚本 → 做练习 (python exercises.py 自动判分)<br>
+bash _run_all_tests.sh&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;# 一键复验全部课程代码 (~15 分钟)
+  </div>
+</main>
+
+<footer>
+  📖 每课目录里：<b>README.md</b> 是讲解与推导，<b>*.py</b> 可直接运行并自动出图，
+  <b>exercises.py</b> 是练习（含测试），<b>solutions.py</b> 是参考答案。
+  互链： <a href="references.md">参考资源地图</a> ·
+  <a href="https://github.com/moyu979/ai_playground">GitHub 仓库</a> ·
+  MIT License
+</footer>
+
+<script>
+"use strict";
+window.onerror = (m, s, l) => {
+  const d = document.createElement("div");
+  d.style.cssText = "background:#fee2e2;color:#b91c1c;padding:8px 14px;font-size:13px;margin:10px 26px;border-radius:8px";
+  d.textContent = "脚本错误: " + m + " @line " + l;
+  document.body.prepend(d);
+};
+
+const LESSONS = [
+  { id:"l00", n:"00", t:"环境搭建", d:"conda 环境 / 自检脚本 / MPS 加速验证",
+    page:null, dir:"00_setup" },
+  { id:"l01", n:"01", t:"NumPy 速成", d:"向量化思维、广播规则、einsum —— 深度学习的张量语言",
+    page:"pages/01_numpy.html", dir:"01_numpy" },
+  { id:"l02", n:"02", t:"线性回归与梯度下降", d:"损失曲面、学习率稳定性 lr < 2/λmax、SGD 热噪声",
+    page:"pages/02_gd.html", dir:"02_gradient_descent" },
+  { id:"l03", n:"03", t:"逻辑回归", d:"sigmoid=费米分布、softmax=玻尔兹曼分布、交叉熵=负对数似然",
+    page:"pages/03_sigmoid.html", dir:"03_logistic_regression" },
+  { id:"l04", n:"04", t:"神经网络与反向传播", d:"纯 NumPy 手写 MLP，四个方程走天下（全程枢纽课）",
+    page:"pages/04_mlp.html", dir:"04_neural_network" },
+  { id:"l05", n:"05", t:"自动微分引擎", d:"100 行手写 micrograd：计算图 + 拓扑排序 + 链式法则自动化",
+    page:"pages/05_autograd.html", dir:"05_autograd" },
+  { id:"l06", n:"06", t:"PyTorch 入门", d:"你的 micrograd 的工业版：五步真言 + 常见 bug 反面教材",
+    page:"pages/06_pytorch.html", dir:"06_pytorch" },
+  { id:"l07", n:"07", t:"卷积神经网络", d:"对称性→权重共享；MNIST 98.9%；Pool vs Stride 对照",
+    page:"pages/07_cnn.html", dir:"07_cnn" },
+  { id:"l08", n:"08", t:"语言模型：bigram→RNN", d:"困惑度、embedding、梯度消失实测（注意力前传）",
+    page:"pages/08_lm.html", dir:"08_sequence_models" },
+  { id:"l09", n:"09", t:"注意力机制", d:"Q·K·V 软查询、因果掩码、multi-head、√d 的方差分析",
+    page:"pages/09_attention.html", dir:"09_attention" },
+  { id:"l10", n:"10", t:"Transformer (GPT)", d:"组装 nanoGPT 风格模型并训练；温度/top-k 采样；消融实验",
+    page:"pages/10_transformer.html", dir:"10_transformer" },
+];
+
+const KEY = "course_done_v1";
+function loadDone() { try { return JSON.parse(localStorage.getItem(KEY) || "{}"); } catch (e) { return {}; } }
+function saveDone(d) { try { localStorage.setItem(KEY, JSON.stringify(d)); } catch (e) { /* 忽略 */ } }
+
+function render() {
+  const box = document.getElementById("lessons");
+  const done = loadDone();
+  box.innerHTML = "";
+  for (const L of LESSONS) {
+    const card = document.createElement("div");
+    card.className = "lcard" + (done[L.id] ? " done" : "");
+    const num = document.createElement("div");
+    num.className = "lnum"; num.textContent = done[L.id] ? "✓" : L.n;
+    const body = document.createElement("div");
+    const h = document.createElement("h3"); h.textContent = L.t;
+    const p = document.createElement("p"); p.textContent = L.d;
+    const links = document.createElement("div"); links.className = "llinks";
+    if (L.page) {
+      const a = document.createElement("a");
+      a.href = L.page; a.textContent = "🌐 互动页";
+      links.append(a);
+    }
+    const r = document.createElement("a");
+    r.href = L.dir + "/README.md"; r.textContent = "📖 讲解";
+    links.append(r);
+    const e = document.createElement("span");
+    e.style.color = "#9aa3b2"; e.textContent = "💻 " + L.dir + "/";
+    links.append(e);
+    const lab = document.createElement("label");
+    const cb = document.createElement("input");
+    cb.type = "checkbox"; cb.checked = !!done[L.id];
+    cb.onchange = () => {
+      const d = loadDone(); d[L.id] = cb.checked; saveDone(d); render();
+    };
+    lab.append(cb, document.createTextNode("学完 ✓"));
+    links.append(lab);
+    body.append(h, p, links);
+    card.append(num, body);
+    box.append(card);
+  }
+  const n = LESSONS.filter(L => loadDone()[L.id]).length;
+  document.getElementById("bar").style.width = (n / LESSONS.length * 100) + "%";
+  document.getElementById("prog-text").textContent = n + " / " + LESSONS.length;
+}
+function resetProgress() { saveDone({}); render(); }
+render();
+</script>
+</body>
+</html>

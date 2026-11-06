@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>03 · 逻辑回归 — AI Playground</title>
+<style>
+  :root{--orange:#e8871a;--blue:#4a8df0;--green:#3fbf7f;--ink:#1f2430;--muted:#6b7280;--bg:#f7f7f9;--line:#e5e7eb}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:"PingFang SC","Hiragino Sans GB","Microsoft YaHei",system-ui,sans-serif}
+  header{padding:18px 26px 8px}
+  .nav{display:flex;gap:14px;font-size:13px;margin-bottom:10px}
+  .nav a{color:var(--blue);text-decoration:none}
+  .nav .pos{color:var(--muted)}
+  h1{margin:0;font-size:24px}
+  .sub{margin:4px 0 0;color:var(--muted);font-size:14px}
+  main{padding:6px 26px 30px;max-width:1100px}
+  .card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:16px 20px;margin-top:16px}
+  .card h2{margin:0 0 10px;font-size:17px}
+  .card p{line-height:1.8;font-size:14px;margin:8px 0}
+  code{background:#eef1f6;border-radius:5px;padding:1px 6px;font-size:13px}
+  .bridge{border-left:4px solid var(--green)}
+  .bridge code{background:#e6f4ec}
+  .ctl{display:flex;flex-wrap:wrap;gap:16px;align-items:center;font-size:13px;margin:10px 0}
+  .ctl label{display:flex;align-items:center;gap:8px}
+  input[type=range]{width:170px}
+  canvas{border:1px solid var(--line);border-radius:10px;background:#fff}
+  .row{display:flex;gap:22px;flex-wrap:wrap}
+  .stat{font-size:13px;color:var(--muted)}
+  .stat b{color:var(--ink)}
+  footer{padding:10px 26px 34px;color:var(--muted);font-size:13px;max-width:1100px}
+  footer a{color:var(--blue)}
+  .formula{background:#0d1220;color:#d8e0f0;border-radius:10px;padding:12px 16px;
+           font-family:ui-monospace,Menlo,monospace;font-size:13px;line-height:1.8;overflow:auto}
+</style>
+</head>
+<body>
+<header>
+  <div class="nav">
+    <a href="../index.html">🏠 课程首页</a><a href="02_gd.html">◀ 上一课</a>
+    <span class="pos">第 03 课 / 共 10</span>
+    <a href="04_mlp.html" style="margin-left:auto">下一课 ▶</a>
+  </div>
+  <h1>03 · 逻辑回归</h1>
+  <p class="sub">sigmoid = 费米-狄拉克分布，softmax = 玻尔兹曼分布。物理人直呼眼熟。</p>
+</header>
+<main>
+
+<div class="card">
+  <h2>🎯 本课在讲什么</h2>
+  <p>分类需要输出<b>概率</b>。线性分数 z = w·x + b 过一层非线性映射：
+     <b>σ(z) = 1/(1+e<sup>−z</sup>)</b>（二分类）或 <b>softmax</b>（多分类）。
+     损失用<b>交叉熵 = 负对数似然</b>——它和 sigmoid 配对后，梯度漂亮到只剩
+     <b>p − y</b>（预测减标签）。</p>
+  <div class="formula">
+σ(z) = 1/(1+e<sup>−z</sup>)            σ'(z) = σ(1−σ)<br>
+L = −[y·log p + (1−y)·log(1−p)]   →   ∂L/∂z = p − y<br>
+softmax(z)<sub>k</sub> = e<sup>z<sub>k</sub></sup>/Σ<sub>j</sub>e<sup>z<sub>j</sub></sup>   ← 令 z<sub>k</sub> = −E<sub>k</sub>/T, 这就是玻尔兹曼分布, T=1
+  </div>
+</div>
+
+<div class="card">
+  <h2>🧪 动手玩 ①：亲手拧一条决策边界</h2>
+  <p style="margin-top:0">下面 120 个点来自两类高斯团。<b>拖动三个滑块，手工做一次"逻辑回归"</b>——
+     你会体会到：w 控制边界方向，b 控制偏移，最优解就藏在损失曲面的谷底。</p>
+  <div class="ctl">
+    <label>w₁ <input type="range" id="w1" min="-4" max="4" step="0.05" value="1.5"><span id="w1v">1.50</span></label>
+    <label>w₂ <input type="range" id="w2" min="-4" max="4" step="0.05" value="1.5"><span id="w2v">1.50</span></label>
+    <label>b <input type="range" id="bb" min="-4" max="4" step="0.05" value="0"><span id="bbv">0.00</span></label>
+    <button class="sec" onclick="autoFit()">✨ 让梯度下降替我拧</button>
+  </div>
+  <div class="row">
+    <div>
+      <div class="stat">数据 + 决策边界 (w·x+b = 0)</div>
+      <canvas id="cv-b" width="420" height="380"></canvas>
+    </div>
+    <div>
+      <div class="stat">损失曲面 L(w₁,w₂) (b 固定为你拖的值)</div>
+      <canvas id="cv-l" width="420" height="380"></canvas>
+    </div>
+  </div>
+  <p class="stat">当前准确率 <b id="acc">—</b> · 交叉熵 <b id="ce">—</b>
+     （损失曲面上的红星 = 最优 w₁,w₂；把 b 拖到 0 附近再点 ✨ 看它滑进谷底）</p>
+</div>
+
+<div class="card">
+  <h2>🧪 动手玩 ②：sigmoid 与它的导数</h2>
+  <div class="ctl">
+    <label>z <input type="range" id="zv" min="-6" max="6" step="0.05" value="0"><span id="zvv">0.00</span></label>
+  </div>
+  <canvas id="cv-s" width="860" height="260"></canvas>
+  <p class="stat">z = <b id="zvv2">0.00</b> 时: σ(z) = <b id="sv">0.500</b> ·
+     σ'(z) = <b id="dv">0.250</b> (最大值恰在 z=0) ·
+     若 y=1, 交叉熵 −log σ(z) = <b id="lv">0.693</b></p>
+</div>
+
+<div class="card bridge">
+  <h2>🧪 去终端做真练习</h2>
+  <p><code>cd 03_logistic_regression && python logistic_regression.py</code>
+     （含<b>反面教材</b>: 同一个模型在圆环数据上掉到 48.8% —— 线性模型的死刑判决书），
+     然后 <code>python exercises.py</code>（稳定 softmax / log-sum-exp / 梯度检查）。
+     讲解: <a href="../03_logistic_regression/README.md" style="color:var(--blue)">README.md</a></p>
+</div>
+
+</main>
+<footer>
+  <a href="../index.html">🏠 课程首页</a> · <a href="02_gd.html">◀ 上一课</a> ·
+  <a href="04_mlp.html">下一课：神经网络与反向传播 ▶</a> · <a href="../playground/index.html">🧪 Playground</a>
+</footer>
+
+<script>
+"use strict";
+window.onerror = (m, s, l) => {
+  const d = document.createElement("div");
+  d.style.cssText = "background:#fee2e2;color:#b91c1c;padding:8px 14px;font-size:13px;margin:10px 26px;border-radius:8px";
+  d.textContent = "脚本错误: " + m + " @line " + l;
+  document.body.prepend(d);
+};
+
+const $ = (id) => document.getElementById(id);
+// ---------- 数据: 两类高斯团 ----------
+const data = [];
+(function () {
+  let s = 42; const rand = () => { s = (s * 16807) % 2147483647; return (s - 1) / 2147483646; };
+  const g = () => { let u = 0, v = 0, t = 0; do { u = rand() * 2 - 1; v = rand() * 2 - 1; t = u * u + v * v; } while (t >= 1 || t === 0); return u * Math.sqrt(-2 * Math.log(t) / t); };
+  for (let i = 0; i < 60; i++) data.push({ x: -1.4 + g() * 0.7, y: -1.0 + g() * 0.7, c: 0 });
+  for (let i = 0; i < 60; i++) data.push({ x: 1.4 + g() * 0.7, y: 1.0 + g() * 0.7, c: 1 });
+})();
+const sig = (z) => 1 / (1 + Math.exp(-z));
+
+// ---------- ① 手工决策边界 ----------
+function params() {
+  return [parseFloat($("w1").value), parseFloat($("w2").value), parseFloat($("bb").value)];
+}
+function drawBoundary() {
+  const [w1, w2, b] = params();
+  $("w1v").textContent = w1.toFixed(2); $("w2v").textContent = w2.toFixed(2);
+  $("bbv").textContent = b.toFixed(2);
+  const cv = $("cv-b"), ctx = cv.getContext("2d");
+  ctx.clearRect(0, 0, cv.width, cv.height);
+  const px = (x) => (x + 3.2) / 6.4 * cv.width, py = (y) => (3.2 - y) / 6.4 * cv.height;
+  // 概率底色 (粗网格)
+  const N = 46;
+  for (let gy = 0; gy < N; gy++) for (let gx = 0; gx < N; gx++) {
+    const x = -3.2 + 6.4 * gx / (N - 1), y = 3.2 - 6.4 * gy / (N - 1);
+    const p = sig(w1 * x + w2 * y + b);
+    ctx.fillStyle = p > 0.5
+      ? `rgba(232,135,26,${(p - 0.5) * 0.55 + 0.05})`
+      : `rgba(74,141,240,${(0.5 - p) * 0.55 + 0.05})`;
+    const cw = cv.width / (N - 1), ch = cv.height / (N - 1);
+    ctx.fillRect(gx * cw - cw / 2, gy * ch - ch / 2, cw + 1, ch + 1);
+  }
+  // 边界线 w1 x + w2 y + b = 0
+  ctx.beginPath();
+  if (Math.abs(w2) > Math.abs(w1) * 0.05) {
+    const ya = (-b - w1 * -3.2) / w2, yb = (-b - w1 * 3.2) / w2;
+    ctx.moveTo(px(-3.2), py(ya)); ctx.lineTo(px(3.2), py(yb));
+  } else {
+    const xa = (-b - w2 * -3.2) / w1, xb = (-b - w2 * 3.2) / w1;
+    ctx.moveTo(px(xa), py(-3.2)); ctx.lineTo(px(xb), py(3.2));
+  }
+  ctx.strokeStyle = "#111"; ctx.lineWidth = 2; ctx.stroke();
+  // 点
+  for (const d of data) {
+    ctx.beginPath(); ctx.arc(px(d.x), py(d.y), 3.6, 0, 7);
+    ctx.fillStyle = d.c === 0 ? "#4a8df0" : "#e8871a"; ctx.fill();
+    ctx.lineWidth = 0.6; ctx.strokeStyle = "rgba(0,0,0,.4)"; ctx.stroke();
+  }
+  // 读数
+  let ok = 0, ce = 0;
+  for (const d of data) {
+    const p = sig(w1 * d.x + w2 * d.y + b);
+    if ((p > 0.5 ? 1 : 0) === d.c) ok++;
+    const pc = Math.min(Math.max(p, 1e-12), 1 - 1e-12);
+    ce += -(d.c * Math.log(pc) + (1 - d.c) * Math.log(1 - pc));
+  }
+  $("acc").textContent = (ok / data.length * 100).toFixed(1) + "%";
+  $("ce").textContent = (ce / data.length).toFixed(4);
+  drawLossSurface();
+}
+function drawLossSurface() {
+  const b = parseFloat($("bb").value);
+  const cv = $("cv-l"), ctx = cv.getContext("2d");
+  const N = 90;
+  let lo = Infinity, hi = -Infinity;
+  const grid = [];
+  for (let gy = 0; gy < N; gy++) {
+    grid.push([]);
+    for (let gx = 0; gx < N; gx++) {
+      const w1 = -4 + 8 * gx / (N - 1), w2 = 4 - 8 * gy / (N - 1);
+      let L = 0;
+      for (const d of data) {
+        const p = Math.min(Math.max(sig(w1 * d.x + w2 * d.y + b), 1e-12), 1 - 1e-12);
+        L += -(d.c * Math.log(p) + (1 - d.c) * Math.log(1 - p));
+      }
+      L /= data.length;
+      grid[gy].push(L); lo = Math.min(lo, L); hi = Math.max(hi, L);
+    }
+  }
+  const img = ctx.createImageData(N, N);
+  for (let gy = 0; gy < N; gy++) for (let gx = 0; gx < N; gx++) {
+    const t = (grid[gy][gx] - lo) / (hi - lo);
+    const idx = (gy * N + gx) * 4;
+    img.data[idx] = 247 - t * 180; img.data[idx + 1] = 249 - t * 190; img.data[idx + 2] = 252 - t * 130;
+    img.data[idx + 3] = 255;
+  }
+  const off = document.createElement("canvas"); off.width = N; off.height = N;
+  off.getContext("2d").putImageData(img, 0, 0);
+  ctx.imageSmoothingEnabled = true;
+  ctx.clearRect(0, 0, cv.width, cv.height);
+  ctx.drawImage(off, 0, 0, cv.width, cv.height);
+  const px = (w1) => (w1 + 4) / 8 * cv.width, py = (w2) => (4 - w2) / 8 * cv.height;
+  // 当前 (w1,w2)
+  const [w1, w2] = params();
+  ctx.beginPath(); ctx.arc(px(w1), py(w2), 6, 0, 7);
+  ctx.fillStyle = "#e8871a"; ctx.fill(); ctx.strokeStyle = "#fff"; ctx.lineWidth = 1.5; ctx.stroke();
+  // ✨ 解: 简易 GD 数百步找最优
+  let a = w1, c = w2;
+  for (let i = 0; i < 400; i++) {
+    let g1 = 0, g2 = 0;
+    for (const d of data) {
+      const p = sig(a * d.x + c * d.y + b);
+      g1 += (p - d.c) * d.x; g2 += (p - d.c) * d.y;
+    }
+    a -= 0.5 * g1 / data.length; c -= 0.5 * g2 / data.length;
+  }
+  ctx.beginPath();
+  ctx.moveTo(px(a) - 7, py(c) + 5); ctx.lineTo(px(a) + 7, py(c) + 5); ctx.lineTo(px(a), py(c) - 8);
+  ctx.closePath(); ctx.fillStyle = "#111"; ctx.fill();
+}
+function autoFit() {
+  const b = parseFloat($("bb").value);
+  let w1 = parseFloat($("w1").value), w2 = parseFloat($("w2").value);
+  // 记录轨迹用于动画
+  const traj = [[w1, w2]];
+  for (let i = 0; i < 120; i++) {
+    let g1 = 0, g2 = 0;
+    for (const d of data) {
+      const p = sig(w1 * d.x + w2 * d.y + b);
+      g1 += (p - d.c) * d.x; g2 += (p - d.c) * d.y;
+    }
+    w1 -= 0.8 * g1 / data.length; w2 -= 0.8 * g2 / data.length;
+    traj.push([w1, w2]);
+  }
+  let k = 0;
+  const iv = setInterval(() => {
+    $("w1").value = traj[k][0]; $("w2").value = traj[k][1];
+    drawBoundary();
+    if (++k >= traj.length) clearInterval(iv);
+  }, 24);
+}
+// ---------- ② sigmoid 探索 ----------
+function drawSigmoid() {
+  const z = parseFloat($("zv").value);
+  $("zvv").textContent = z.toFixed(2); $("zvv2").textContent = z.toFixed(2);
+  const cv = $("cv-s"), ctx = cv.getContext("2d");
+  ctx.clearRect(0, 0, cv.width, cv.height);
+  const px = (x) => (x + 6) / 12 * cv.width, py = (y) => cv.height - 30 - y * (cv.height - 50);
+  ctx.strokeStyle = "#e5e7eb";
+  ctx.beginPath(); ctx.moveTo(0, py(0.5)); ctx.lineTo(cv.width, py(0.5)); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(px(0), 0); ctx.lineTo(px(0), cv.height - 20); ctx.stroke();
+  // σ
+  ctx.beginPath();
+  for (let x = -6; x <= 6; x += 0.1) {
+    const X = px(x), Y = py(sig(x));
+    x === -6 ? ctx.moveTo(X, Y) : ctx.lineTo(X, Y);
+  }
+  ctx.strokeStyle = "#4a8df0"; ctx.lineWidth = 2.4; ctx.stroke();
+  // σ'
+  ctx.beginPath();
+  for (let x = -6; x <= 6; x += 0.1) {
+    const s = sig(x), X = px(x), Y = py(s * (1 - s));
+    x === -6 ? ctx.moveTo(X, Y) : ctx.lineTo(X, Y);
+  }
+  ctx.strokeStyle = "#e8871a"; ctx.lineWidth = 2; ctx.setLineDash([5, 4]); ctx.stroke();
+  ctx.setLineDash([]);
+  // 当前点
+  const s = sig(z), d = s * (1 - s);
+  ctx.beginPath(); ctx.arc(px(z), py(s), 5, 0, 7); ctx.fillStyle = "#4a8df0"; ctx.fill();
+  ctx.beginPath(); ctx.arc(px(z), py(d), 5, 0, 7); ctx.fillStyle = "#e8871a"; ctx.fill();
+  ctx.fillStyle = "#6b7280"; ctx.font = "12px sans-serif";
+  ctx.fillText("σ(z) 蓝", 12, 20); ctx.fillText("σ'(z) 橙虚线", 12, 38);
+  ctx.fillText("-6", px(-6), cv.height - 6); ctx.fillText("+6", cv.width - 22, cv.height - 6);
+  $("sv").textContent = s.toFixed(3);
+  $("dv").textContent = d.toFixed(3);
+  $("lv").textContent = (-Math.log(Math.min(Math.max(s, 1e-12), 1))).toFixed(3);
+}
+["w1", "w2", "bb"].forEach((id) => $(id).addEventListener("input", drawBoundary));
+$("zv").addEventListener("input", drawSigmoid);
+drawBoundary(); drawSigmoid();
+</script>
+</body>
+</html>

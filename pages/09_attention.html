@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>09 · 注意力机制 — AI Playground</title>
+<style>
+  :root{--orange:#e8871a;--blue:#4a8df0;--green:#3fbf7f;--ink:#1f2430;--muted:#6b7280;--bg:#f7f7f9;--line:#e5e7eb}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:"PingFang SC","Hiragino Sans GB","Microsoft YaHei",system-ui,sans-serif}
+  header{padding:18px 26px 8px}
+  .nav{display:flex;gap:14px;font-size:13px;margin-bottom:10px}
+  .nav a{color:var(--blue);text-decoration:none}
+  .nav .pos{color:var(--muted)}
+  h1{margin:0;font-size:24px}
+  .sub{margin:4px 0 0;color:var(--muted);font-size:14px}
+  main{padding:6px 26px 30px;max-width:1100px}
+  .card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:16px 20px;margin-top:16px}
+  .card h2{margin:0 0 10px;font-size:17px}
+  .card p{line-height:1.8;font-size:14px;margin:8px 0}
+  code{background:#eef1f6;border-radius:5px;padding:1px 6px;font-size:13px}
+  .bridge{border-left:4px solid var(--green)}
+  .bridge code{background:#e6f4ec}
+  .ctl{display:flex;flex-wrap:wrap;gap:16px;align-items:center;font-size:13px;margin:10px 0}
+  .ctl label{display:flex;align-items:center;gap:8px}
+  input[type=range]{width:150px}
+  select{font-size:13px;padding:3px 6px;border-radius:6px;border:1px solid var(--line)}
+  canvas{border:1px solid var(--line);border-radius:10px;background:#fff}
+  .stat{font-size:13px;color:var(--muted)}
+  .stat b{color:var(--ink)}
+  .formula{background:#0d1220;color:#d8e0f0;border-radius:10px;padding:12px 16px;
+           font-family:ui-monospace,Menlo,monospace;font-size:13px;line-height:1.8;overflow:auto}
+  footer{padding:10px 26px 34px;color:var(--muted);font-size:13px;max-width:1100px}
+  footer a{color:var(--blue)}
+</style>
+</head>
+<body>
+<header>
+  <div class="nav">
+    <a href="../index.html">🏠 课程首页</a><a href="08_lm.html">◀ 上一课</a>
+    <span class="pos">第 09 课 / 共 10</span>
+    <a href="10_transformer.html" style="margin-left:auto">下一课 ▶</a>
+  </div>
+  <h1>09 · 注意力机制</h1>
+  <p class="sub">每个位置直接"看见"所有位置，按相关性加权取用 —— O(1) 路径长度，GPU 并行友好。</p>
+</header>
+<main>
+
+<div class="card">
+  <h2>🎯 本课在讲什么</h2>
+  <p>每个 token 被三个矩阵投三次影：<b>Query</b>（我在找什么）、<b>Key</b>（我可被怎么找到）、
+     <b>Value</b>（找到我带走什么）。注意力 = <b>软字典查询</b>：
+     内积打分 → 除 √d 防 softmax 饱和 → 因果掩码挡住未来 → softmax 归一 → 加权混合 Value。</p>
+  <div class="formula">
+Attention(Q, K, V) = softmax( QKᵀ/√d<sub>k</sub> + mask ) · V<br>
+为什么除 √d: 随机向量内积的方差 = d (方差相加, 像随机行走) → 不除则分数过大 → softmax 饱和 → 梯度死区
+  </div>
+</div>
+
+<div class="card">
+  <h2>🧪 动手玩：给 "it" 一个 query, 看它看向谁</h2>
+  <p style="margin-top:0">句子 <b>"it sat on cat mat"</b>。每个 token 的 Key 带 3 维语义
+     [名词性, 动词性, 物件性]。拖动代词 it 的 query 需求，看注意力重新分配。</p>
+  <div class="ctl">
+    <label>query 位置 t
+      <select id="qt"><option value="0" selected>0 (it)</option><option value="1">1 (sat)</option>
+      <option value="2">2 (on)</option><option value="3">3 (cat)</option><option value="4">4 (mat)</option></select></label>
+    <label>找名词 <input type="range" id="qn" min="-2" max="2" step="0.1" value="2"><span id="qnv">2.0</span></label>
+    <label>找动词 <input type="range" id="qv" min="-2" max="2" step="0.1" value="0.5"><span id="qvv">0.5</span></label>
+    <label>找物件 <input type="range" id="qo" min="-2" max="2" step="0.1" value="0"><span id="qov">0.0</span></label>
+    <label><input type="checkbox" id="scale" checked> ÷√d</label>
+    <label><input type="checkbox" id="causal" checked> 因果掩码</label>
+  </div>
+  <div class="row">
+    <div><div class="stat">注意力权重 (行 = query t, 列 = key)</div>
+      <canvas id="cv-a" width="520" height="230"></canvas></div>
+    <div><div class="stat">选中行的 softmax 分配</div>
+      <canvas id="cv-bar" width="460" height="230"></canvas></div>
+  </div>
+  <p class="stat">输出 = Σ 注意力·Value (加权混合的上下文向量):
+     <b id="outv">—</b><br>
+     🧪 试一试: ① "找名词"拉满 → it 看向 cat；② 关掉 ÷√d → 分布变尖锐 (饱和!)；
+     ③ query 位置 t=4 + 因果掩码 → 只能看 t≤4。第 10 课自检: <b>篡改未来 token, 过去输出必须不变</b>。</p>
+</div>
+
+<div class="card bridge">
+  <h2>🧪 去终端做真练习</h2>
+  <p><code>cd 09_attention && python attention_numpy.py</code>（NumPy 手撕 QKV + 四宫格解剖图），
+     <code>python self_attention_torch.py</code>（形状/因果性/官方算子三重自检——模块将被第 10 课原样搬用），
+     <code>python exercises.py</code>。讲解: <a href="../09_attention/README.md" style="color:var(--blue)">README.md</a></p>
+</div>
+
+</main>
+<footer>
+  <a href="../index.html">🏠 课程首页</a> · <a href="08_lm.html">◀ 上一课</a> ·
+  <a href="10_transformer.html">下一课：Transformer ▶</a> · <a href="../playground/index.html">🧪 Playground</a>
+</footer>
+
+<script>
+"use strict";
+window.onerror = (m, s, l) => {
+  const d = document.createElement("div");
+  d.style.cssText = "background:#fee2e2;color:#b91c1c;padding:8px 14px;font-size:13px;margin:10px 26px;border-radius:8px";
+  d.textContent = "脚本错误: " + m + " @line " + l;
+  document.body.prepend(d);
+};
+
+const $ = (id) => document.getElementById(id);
+// tokens: [词, K 特征 (名词性, 动词性, 物件性), V 向量]
+const TOK = [
+  { w: "it",  k: [0.0, 0.1, 0.0], v: [1.0, 0.2, -0.5] },
+  { w: "sat", k: [0.1, 2.0, 0.0], v: [0.1, 1.0, 0.3] },
+  { w: "on",  k: [0.2, 0.3, 0.6], v: [0.0, 0.1, 0.8] },
+  { w: "cat", k: [2.0, 0.0, 0.3], v: [1.2, -0.3, 0.6] },
+  { w: "mat", k: [1.6, 0.0, 1.2], v: [0.9, 0.0, 1.1] },
+];
+function attention() {
+  const t = parseInt($("qt").value);
+  const q = [parseFloat($("qn").value), parseFloat($("qv").value), parseFloat($("qo").value)];
+  $("qnv").textContent = q[0].toFixed(1); $("qvv").textContent = q[1].toFixed(1);
+  $("qov").textContent = q[2].toFixed(1);
+  const scale = $("scale").checked, causal = $("causal").checked;
+  const scores = TOK.map((tok, j) => {
+    let s = q[0] * tok.k[0] + q[1] * tok.k[1] + q[2] * tok.k[2];
+    if (scale) s /= Math.sqrt(3);
+    if (causal && j > t) return -Infinity;
+    return s;
+  });
+  const mx = Math.max(...scores.filter(s => isFinite(s)));
+  const exp = scores.map(s => isFinite(s) ? Math.exp(s - mx) : 0);
+  const Z = exp.reduce((a, b) => a + b, 0);
+  const w = exp.map(e => e / Z);
+  const out = [0, 1, 2].map(d => w.reduce((acc, wi, j) => acc + wi * TOK[j].v[d], 0));
+  return { t, w, out };
+}
+function render() {
+  const { t, w, out } = attention();
+  // 热图 (1×5 → 画成 5×5 矩阵: 行=每个位置作为 query 用同一组参数? 简化: 只画选中行)
+  const cv = $("cv-a"), ctx = cv.getContext("2d");
+  ctx.clearRect(0, 0, cv.width, cv.height);
+  const cell = 22, ox = 110, oy = 36;
+  ctx.font = "11px Menlo"; ctx.fillStyle = "#6b7280";
+  TOK.forEach((tok, j) => ctx.fillText(tok.w, ox + j * cell + 3, 26));
+  TOK.forEach((tok, i) => {
+    ctx.fillStyle = i === t ? "#e8871a" : "#6b7280";
+    ctx.fillText(tok.w, 40, oy + i * cell + 10);
+  });
+  const sc = TOK.map((tok, j) => {
+    let s = q()[0] * tok.k[0] + q()[1] * tok.k[1] + q()[2] * tok.k[2];
+    if ($("scale").checked) s /= Math.sqrt(3);
+    if ($("causal").checked && j > t) return null;
+    return s;
+  });
+  function q() { return [parseFloat($("qn").value), parseFloat($("qv").value), parseFloat($("qo").value)]; }
+  const sm = attention().w;
+  for (let i = 0; i < 5; i++) for (let j = 0; j < 5; j++) {
+    let a = 0.04;
+    if (i === t && isFinite(sc[j])) a = 0.06 + sm[j] * 0.9;
+    else if (i !== t) a = 0.02;
+    ctx.fillStyle = `rgba(74,141,240,${a})`;
+    ctx.fillRect(ox + j * cell, oy + i * cell, cell - 1, cell - 1);
+    if (i === t) {
+      ctx.fillStyle = sm[j] > 0.5 ? "#fff" : "#1f2430";
+      ctx.font = "8px Menlo"; ctx.textAlign = "center";
+      ctx.fillText((sm[j] * 100).toFixed(0), ox + j * cell + cell / 2, oy + i * cell + cell / 2 + 3);
+      ctx.textAlign = "left";
+    }
+  }
+  ctx.fillStyle = "#6b7280"; ctx.font = "11px sans-serif";
+  ctx.fillText("被掩码的位置 (未来) → 全 0", ox + 5 * cell + 8, oy + 3 * cell);
+  // 柱状图
+  const cv2 = $("cv-bar"), c2 = cv2.getContext("2d");
+  c2.clearRect(0, 0, cv2.width, cv2.height);
+  const bw = (cv2.width - 40) / 5;
+  TOK.forEach((tok, j) => {
+    const masked = $("causal").checked && j > t;
+    const h = sm[j] * (cv2.height - 52);
+    c2.fillStyle = masked ? "#d1d5db" : j === t ? "#e8871a" : "#4a8df0";
+    c2.fillRect(30 + j * bw, cv2.height - 30 - h, bw - 8, h);
+    c2.fillStyle = "#6b7280"; c2.font = "12px sans-serif"; c2.textAlign = "center";
+    c2.fillText(tok.w, 30 + j * bw + bw / 2, cv2.height - 12);
+    if (!masked) { c2.fillStyle = "#1f2430"; c2.fillText((sm[j] * 100).toFixed(1) + "%", 30 + j * bw + bw / 2, cv2.height - 36 - h); }
+  });
+  c2.textAlign = "left";
+  $("outv").textContent = "[" + out.map(v => v.toFixed(2)).join(", ") + "]";
+}
+["qt", "qn", "qv", "qo", "scale", "causal"].forEach(id => $(id).addEventListener("input", render));
+render();
+</script>
+</body>
+</html>

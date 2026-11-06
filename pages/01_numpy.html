@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>01 · NumPy 速成 — AI Playground</title>
+<style>
+  :root{--orange:#e8871a;--blue:#4a8df0;--green:#3fbf7f;--ink:#1f2430;--muted:#6b7280;--bg:#f7f7f9;--line:#e5e7eb}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:"PingFang SC","Hiragino Sans GB","Microsoft YaHei",system-ui,sans-serif}
+  header{padding:18px 26px 8px}
+  .nav{display:flex;gap:14px;font-size:13px;margin-bottom:10px}
+  .nav a{color:var(--blue);text-decoration:none}
+  .nav .pos{color:var(--muted)}
+  h1{margin:0;font-size:24px}
+  .sub{margin:4px 0 0;color:var(--muted);font-size:14px}
+  main{padding:6px 26px 30px;max-width:1000px}
+  .card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:16px 20px;margin-top:16px}
+  .card h2{margin:0 0 10px;font-size:17px}
+  .card p{line-height:1.8;font-size:14px;margin:8px 0}
+  code{background:#eef1f6;border-radius:5px;padding:1px 6px;font-size:13px}
+  .bridge{border-left:4px solid var(--green)}
+  .bridge code{background:#e6f4ec}
+  .ctl{display:flex;flex-wrap:wrap;gap:16px;align-items:center;font-size:13px;margin:10px 0}
+  .ctl label{display:flex;align-items:center;gap:6px}
+  select{font-size:13px;padding:3px 6px;border-radius:6px;border:1px solid var(--line)}
+  button{border:none;border-radius:8px;padding:7px 14px;font-size:13px;cursor:pointer;background:var(--blue);color:#fff;font-weight:600}
+  button.sec{background:#eef1f6;color:var(--ink)}
+  .msg{font-size:13.5px;margin-top:10px;padding:8px 12px;border-radius:8px}
+  .ok{background:#e6f4ec;color:#166534}
+  .bad{background:#fee2e2;color:#b91c1c}
+  canvas{border:1px solid var(--line);border-radius:10px;background:#fff}
+  .row{display:flex;gap:22px;flex-wrap:wrap;align-items:flex-start}
+  .stat{font-size:13px;color:var(--muted)}
+  table{border-collapse:collapse;font-size:13px}
+  td,th{border:1px solid var(--line);padding:5px 10px;text-align:left}
+  footer{padding:10px 26px 34px;color:var(--muted);font-size:13px;max-width:1000px}
+  footer a{color:var(--blue)}
+</style>
+</head>
+<body>
+<header>
+  <div class="nav">
+    <a href="../index.html">🏠 课程首页</a><span class="pos">第 01 课 / 共 10</span>
+    <a href="02_gd.html" style="margin-left:auto">下一课 ▶</a>
+  </div>
+  <h1>01 · NumPy 速成</h1>
+  <p class="sub">向量化思维 · 广播规则 · einsum —— 10 分钟玩明白深度学习的"张量语言"</p>
+</header>
+<main>
+
+<div class="card">
+  <h2>🎯 本课在讲什么</h2>
+  <p>深度学习 = 大规模张量运算。<b>NumPy 的思维方式是"整个场一次性变换"，而不是"每个格点怎么算"</b>——
+  把循环下沉到 C/BLAS 层，快 10~100 倍。本页只玩一个最核心的规则：<b>广播 (broadcasting)</b>，
+  它是后面每一课代码能写得像公式的原因。</p>
+  <p><b>广播规则</b>：两个数组从最后一维向前对齐；每一维<b>相等</b>或<b>其中一方为 1</b>（或缺维）时兼容，
+  为 1 的维度自动虚拟复制。不满足 → 报错。</p>
+</div>
+
+<div class="card">
+  <h2>🧪 动手玩：广播检查器</h2>
+  <div class="ctl">
+    <label>A 形状 <select id="sa">
+      <option>(3,)</option><option selected>(1,3)</option><option>(3,1)</option>
+      <option>(2,3)</option><option>(3,2)</option><option>(4,3)</option>
+    </select></label>
+    <label>运算 <select id="op"><option>+</option><option>×</option></select></label>
+    <label>B 形状 <select id="sb">
+      <option>(3,)</option><option>(1,3)</option><option selected>(3,1)</option>
+      <option>(2,3)</option><option>(3,2)</option><option>(4,3)</option>
+    </select></label>
+    <button onclick="reroll()">重新随机</button>
+  </div>
+  <div class="row">
+    <div><div class="stat">A</div><canvas id="ca" width="200" height="150"></canvas></div>
+    <div style="font-size:20px;align-self:center" id="opsym">+</div>
+    <div><div class="stat">B</div><canvas id="cb" width="200" height="150"></canvas></div>
+    <div style="font-size:20px;align-self:center">=</div>
+    <div><div class="stat">结果</div><canvas id="cr" width="200" height="150"></canvas></div>
+  </div>
+  <div id="msg" class="msg ok"></div>
+  <p class="stat" style="margin-top:12px">经典用法（后面每课都见）：
+    <code>X -= X.mean(0)</code> 每列去均值 ·
+    <code>X / (X.std(0)+1e-8)</code> 标准化 ·
+    <code>logits += b</code> batch 加同一偏置</p>
+</div>
+
+<div class="card">
+  <h2>📐 顺手记个 einsum（物理人的母语）</h2>
+  <table>
+    <tr><th>写法</th><th>含义</th><th>等价</th></tr>
+    <tr><td><code>einsum('ij,jk->ik', A, B)</code></td><td>C<sub>ik</sub> = Σ<sub>j</sub> A<sub>ij</sub>B<sub>jk</sub></td><td><code>A @ B</code></td></tr>
+    <tr><td><code>einsum('ij,kj->ik', A, B)</code></td><td>O<sub>ik</sub> = Σ<sub>j</sub> A<sub>ij</sub>B<sub>kj</sub></td><td><code>A @ B.T</code></td></tr>
+    <tr><td><code>einsum('ij->ji', A)</code></td><td>转置</td><td><code>A.T</code></td></tr>
+  </table>
+  <p class="stat">第 09 课注意力 <code>softmax(QKᵀ/√d)V</code> 用 einsum 一行写出。</p>
+</div>
+
+<div class="card bridge">
+  <h2>🧪 去终端做真练习</h2>
+  <p>网页看懂规则，终端练手感（8 道题自动判分，含两两距离、数值梯度——第 4 课的保命工具）：</p>
+  <p><code>cd 01_numpy && python exercises.py</code>&nbsp;&nbsp;
+     卡住看 <code>solutions.py</code>，讲解在 <a href="../01_numpy/README.md" style="color:var(--blue)">README.md</a></p>
+</div>
+
+</main>
+<footer>
+  <a href="../index.html">🏠 课程首页</a> · <a href="02_gd.html">下一课：线性回归与梯度下降 ▶</a> · <a href="../playground/index.html">🧪 Playground</a>
+</footer>
+
+<script>
+"use strict";
+window.onerror = (m, s, l) => {
+  const d = document.createElement("div");
+  d.style.cssText = "background:#fee2e2;color:#b91c1c;padding:8px 14px;font-size:13px;margin:10px 26px;border-radius:8px";
+  d.textContent = "脚本错误: " + m + " @line " + l;
+  document.body.prepend(d);
+};
+
+const $ = (id) => document.getElementById(id);
+function parseShape(s) { return JSON.parse(s.replace("(", "[").replace(")", "]")); }
+let A, B;
+
+function reroll() {
+  const sa = parseShape($("sa").value), sb = parseShape($("sb").value);
+  const nA = sa.reduce((x, y) => x * y, 1), nB = sb.reduce((x, y) => x * y, 1);
+  A = Array.from({length: nA}, () => 1 + Math.floor(Math.random() * 9));
+  B = Array.from({length: nB}, () => 1 + Math.floor(Math.random() * 9));
+  render();
+}
+function reshape(arr, shape) {          // 行主序嵌套数组
+  if (shape.length === 1) return arr.slice();
+  if (shape.length === 0) return arr[0];
+  const n = shape.slice(1).reduce((x, y) => x * y, 1);
+  const out = [];
+  for (let i = 0; i < shape[0]; i++) out.push(reshape(arr.slice(i * n, (i + 1) * n), shape.slice(1)));
+  return out;
+}
+function drawGrid(cv, mat, color) {
+  const ctx = cv.getContext("2d");
+  ctx.clearRect(0, 0, cv.width, cv.height);
+  const rows = mat.length, cols = mat[0].length;
+  const cell = Math.min(40, (cv.width - 20) / cols, (cv.height - 20) / rows);
+  const ox = (cv.width - cols * cell) / 2, oy = (cv.height - rows * cell) / 2;
+  for (let i = 0; i < rows; i++) for (let j = 0; j < cols; j++) {
+    const v = mat[i][j] / 10;
+    ctx.fillStyle = `rgba(${color},${0.15 + v * 0.75})`;
+    ctx.fillRect(ox + j * cell + 1, oy + i * cell + 1, cell - 2, cell - 2);
+    ctx.fillStyle = v > 0.55 ? "#fff" : "#1f2430";
+    ctx.font = "12px Menlo, monospace";
+    ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.fillText(mat[i][j], ox + j * cell + cell / 2, oy + i * cell + cell / 2);
+  }
+}
+function bcastShape(sa, sb) {
+  const la = sa.length, lb = sb.length, n = Math.max(la, lb);
+  const pa = Array(n - la).fill(1).concat(sa);
+  const pb = Array(n - lb).fill(1).concat(sb);
+  const out = [];
+  for (let i = 0; i < n; i++) {
+    if (pa[i] === pb[i]) out.push(pa[i]);
+    else if (pa[i] === 1) out.push(pb[i]);
+    else if (pb[i] === 1) out.push(pa[i]);
+    else return null;
+  }
+  return { out, pa, pb };
+}
+function render() {
+  const sa = parseShape($("sa").value), sb = parseShape($("sb").value);
+  const op = $("op").value === "+" ? ((a, b) => a + b) : ((a, b) => a * b);
+  $("opsym").textContent = $("op").value;
+  const r = bcastShape(sa, sb);
+  const Am = reshape(A, sa), Bm = reshape(B, sb);
+  drawGrid($("ca"), Array.isArray(Am[0]) ? Am : [Am], "46,108,237");
+  drawGrid($("cb"), Array.isArray(Bm[0]) ? Bm : [Bm], "232,135,26");
+  const msg = $("msg");
+  if (!r) {
+    $("cr").getContext("2d").clearRect(0, 0, 200, 150);
+    msg.className = "msg bad";
+    msg.textContent = `✗ 无法广播: ${JSON.stringify(sa)} 与 ${JSON.stringify(sb)} 对齐后某维既不相等、也不为 1 → NumPy 直接报错。把一维改成 1 或相同值试试。`;
+    return;
+  }
+  const rows = r.out.length === 1 ? 1 : r.out[0];
+  const cols = r.out[r.out.length - 1];
+  // 结果格 (i,j) → 原数组取值: 为 1 的维取 0, 其余取 i/j
+  const elem = (flat, sh, i, j) => {
+    const ri = sh.length === 2 ? (sh[0] === 1 ? 0 : i) : 0;
+    const ci = sh[sh.length - 1] === 1 ? 0 : j;
+    return flat[ri * (sh.length === 2 ? sh[1] : 0) + ci];
+  };
+  const Rm = [];
+  for (let i = 0; i < rows; i++) {
+    const row = [];
+    for (let j = 0; j < cols; j++) row.push(op(elem(A, sa, i, j), elem(B, sb, i, j)));
+    Rm.push(row);
+  }
+  drawGrid($("cr"), Rm, "63,191,127");
+  msg.className = "msg ok";
+  msg.textContent = `✓ ${JSON.stringify(sa)} ${$("op").value} ${JSON.stringify(sb)} → ${JSON.stringify(r.out)}  (为 1 的维度被虚拟复制, 不占内存)`;
+}
+["sa", "sb", "op"].forEach((id) => $(id).addEventListener("change", render));
+reroll();
+</script>
+</body>
+</html>

@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>05 · 自动微分引擎 — AI Playground</title>
+<style>
+  :root{--orange:#e8871a;--blue:#4a8df0;--green:#3fbf7f;--ink:#1f2430;--muted:#6b7280;--bg:#f7f7f9;--line:#e5e7eb}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:"PingFang SC","Hiragino Sans GB","Microsoft YaHei",system-ui,sans-serif}
+  header{padding:18px 26px 8px}
+  .nav{display:flex;gap:14px;font-size:13px;margin-bottom:10px}
+  .nav a{color:var(--blue);text-decoration:none}
+  .nav .pos{color:var(--muted)}
+  h1{margin:0;font-size:24px}
+  .sub{margin:4px 0 0;color:var(--muted);font-size:14px}
+  main{padding:6px 26px 30px;max-width:1100px}
+  .card{background:#fff;border:1px solid var(--line);border-radius:12px;padding:16px 20px;margin-top:16px}
+  .card h2{margin:0 0 10px;font-size:17px}
+  .card p{line-height:1.8;font-size:14px;margin:8px 0}
+  code{background:#eef1f6;border-radius:5px;padding:1px 6px;font-size:13px}
+  .bridge{border-left:4px solid var(--green)}
+  .bridge code{background:#e6f4ec}
+  .ctl{display:flex;flex-wrap:wrap;gap:14px;align-items:center;font-size:13px;margin:10px 0}
+  .ctl label{display:flex;align-items:center;gap:6px}
+  input[type=range]{width:110px}
+  button{border:none;border-radius:8px;padding:8px 14px;font-size:13px;cursor:pointer;background:var(--blue);color:#fff;font-weight:600}
+  button.sec{background:#eef1f6;color:var(--ink)}
+  button.warn{background:#fee2e2;color:#b91c1c}
+  .stage{border:1px solid var(--line);border-radius:12px;background:#fff}
+  .stat{font-size:13px;color:var(--muted)}
+  .stat b{color:var(--ink)}
+  footer{padding:10px 26px 34px;color:var(--muted);font-size:13px;max-width:1100px}
+  footer a{color:var(--blue)}
+  .legend span{margin-right:16px;font-size:12.5px;color:var(--muted)}
+</style>
+</head>
+<body>
+<header>
+  <div class="nav">
+    <a href="../index.html">🏠 课程首页</a><a href="04_mlp.html">◀ 上一课</a>
+    <span class="pos">第 05 课 / 共 10</span>
+    <a href="06_pytorch.html" style="margin-left:auto">下一课 ▶</a>
+  </div>
+  <h1>05 · 自动微分引擎</h1>
+  <p class="sub">每个运算只懂自己的局部导数，链式法则交给拓扑排序 —— 这页就是 micrograd 的可视化。</p>
+</header>
+<main>
+
+<div class="card">
+  <h2>🎯 目标表达式（一个小神经元的损失）</h2>
+  <p><b>L = ( tanh(w₁·x₁ + w₂·x₂ + b) − y )²</b> —— 前向从左往右算数值；
+     反向从右往左传梯度，每条边上标着<b>局部导数 × 上游梯度</b>。
+     这正是 <code>micrograd.py</code> 里 <code>Value.backward()</code> 干的事。</p>
+  <div class="ctl">
+    <label>x₁ <input type="range" id="vx1" min="-2" max="2" step="0.05" value="0.8"><span id="lx1">0.80</span></label>
+    <label>x₂ <input type="range" id="vx2" min="-2" max="2" step="0.05" value="-0.4"><span id="lx2">-0.40</span></label>
+    <label>w₁ <input type="range" id="vw1" min="-2" max="2" step="0.05" value="0.6"><span id="lw1">0.60</span></label>
+    <label>w₂ <input type="range" id="vw2" min="-2" max="2" step="0.05" value="-0.9"><span id="lw2">-0.90</span></label>
+    <label>b <input type="range" id="vb" min="-1" max="1" step="0.05" value="0.25"><span id="lb">0.25</span></label>
+    <label>y <input type="range" id="vy" min="-1" max="1" step="0.05" value="0.5"><span id="ly">0.50</span></label>
+  </div>
+  <div class="ctl">
+    <button onclick="runForward()">▶ 前向一遍</button>
+    <button onclick="runBackward()">◀ 反向一遍</button>
+    <button onclick="autoDemo()">🎬 自动演示</button>
+    <button class="warn" onclick="gradCheck()">🔬 梯度检查 (数值 vs 引擎)</button>
+    <button class="sec" onclick="reset()">清空</button>
+  </div>
+  <div class="stage"><svg id="svg" width="100%" height="480" viewBox="0 0 980 480"></svg></div>
+  <p class="stat legend">
+    <span style="color:#3fbf7f">● 输入/参数</span>
+    <span style="color:#4a8df0">▢ 运算节点</span>
+    <span style="color:#e8871a">★ 损失 L</span>
+    节点下方灰字 = ∂L/∂该节点 (反向后出现)。</p>
+  <p class="stat" id="check" style="margin-top:4px">先点「前向」，再点「反向」；然后点「梯度检查」——
+     引擎梯度和有限差分应当一致到小数点后 6 位。</p>
+</div>
+
+<div class="card bridge">
+  <h2>🧪 去终端做真练习</h2>
+  <p><code>cd 05_autograd && python micrograd.py</code>（表达式求导 + 数值对拍），
+     <code>python mlp_micrograd.py</code>（用这台"引擎"训练双月分类——注意有多慢！），
+     <code>python exercises.py</code>（组合 sigmoid / MSE / 用引擎重演第 2 课线性回归）。
+     讲解: <a href="../05_autograd/README.md" style="color:var(--blue)">README.md</a> ·
+     致敬 <a href="https://github.com/karpathy/micrograd" style="color:var(--blue)">karpathy/micrograd</a></p>
+</div>
+
+</main>
+<footer>
+  <a href="../index.html">🏠 课程首页</a> · <a href="04_mlp.html">◀ 上一课</a> ·
+  <a href="06_pytorch.html">下一课：PyTorch 入门 ▶</a> · <a href="../playground/index.html">🧪 Playground</a>
+</footer>
+
+<script>
+"use strict";
+window.onerror = (m, s, l) => {
+  const d = document.createElement("div");
+  d.style.cssText = "background:#fee2e2;color:#b91c1c;padding:8px 14px;font-size:13px;margin:10px 26px;border-radius:8px";
+  d.textContent = "脚本错误: " + m + " @line " + l;
+  document.body.prepend(d);
+};
+
+const $ = (id) => document.getElementById(id);
+const svg = $("svg");
+const P = {};                       // 参数值
+["x1","x2","w1","w2","b","y"].forEach(k => P[k] = parseFloat($( "v"+k ).value));
+
+// 节点: id, x, y, 标签, 类型
+const N = {
+  x1:{x:60,y:60,t:"in",label:"x₁"}, w1:{x:60,y:150,t:"in",label:"w₁"},
+  x2:{x:60,y:250,t:"in",label:"x₂"}, w2:{x:60,y:340,t:"in",label:"w₂"},
+  b:{x:60,y:430,t:"in",label:"b"},
+  m1:{x:230,y:105,t:"op",label:"×"}, m2:{x:230,y:295,t:"op",label:"×"},
+  a1:{x:385,y:200,t:"op",label:"+"},
+  a2:{x:520,y:265,t:"op",label:"+"},
+  t:{x:655,y:265,t:"op",label:"tanh"},
+  d:{x:785,y:330,t:"op",label:"−"},
+  yv:{x:785,y:435,t:"in",label:"y"},
+  sq:{x:900,y:330,t:"op",label:"²"},
+  L:{x:900,y:215,t:"L",label:"L"},
+};
+const E = [                          // [from, to, 局部导数说明]
+  ["x1","m1","w₁"], ["w1","m1","x₁"],
+  ["x2","m2","w₂"], ["w2","m2","x₂"],
+  ["m1","a1","1"], ["m2","a1","1"],
+  ["a1","a2","1"], ["b","a2","1"],
+  ["a2","t","φ'"], ["t","d","1"], ["yv","d","−1"],
+  ["d","sq","2d"],
+];
+const val = {};                      // 前向值
+const gr = {};                       // 梯度
+Object.keys(N).forEach(k => { val[k] = null; gr[k] = null; });
+function forwardAll() {
+  val.x1 = P.x1; val.x2 = P.x2; val.w1 = P.w1; val.w2 = P.w2;
+  val.b = P.b; val.yv = P.y;
+  val.m1 = val.x1 * val.w1;  val.m2 = val.x2 * val.w2;
+  val.a1 = val.m1 + val.m2;  val.a2 = val.a1 + val.b;
+  val.t = Math.tanh(val.a2); val.d = val.t - val.yv;
+  val.sq = val.d * val.d;    val.L = val.sq;
+  return val.L;
+}
+function backwardAll() {             // 返回每步 {node, grad, edge?, note}
+  const steps = [];
+  const g = {}; Object.keys(N).forEach(k => g[k] = 0);
+  g.L = 1;
+  steps.push({ node: "L", g: 1, note: "∂L/∂L = 1" });
+  g.sq = 1;                                   // L = sq
+  steps.push({ node: "sq", g: 1, note: "恒等" });
+  g.d = g.sq * 2 * val.d;                     // sq = d²
+  steps.push({ node: "d", g: g.d, note: `∂/∂d = 2d = ${ (2 * val.d).toFixed(3) }` });
+  const gd_t = g.d * 1, gd_y = g.d * -1;      // d = t − y
+  g.t += gd_t; g.yv += gd_y;
+  steps.push({ node: "t", g: g.t, note: "∂/∂t = 1" });
+  steps.push({ node: "yv", g: g.yv, note: "∂/∂y = −1" });
+  const gd_a2 = g.t * (1 - val.t * val.t);    // t = tanh(a2), φ' = 1−t²
+  g.a2 = gd_a2;
+  steps.push({ node: "a2", g: g.a2, note: `φ' = 1−t² = ${ (1 - val.t ** 2).toFixed(3) }` });
+  const gd_a1 = g.a2 * 1, gd_b = g.a2 * 1;    // a2 = a1 + b
+  g.a1 += gd_a1; g.b += gd_b;
+  steps.push({ node: "a1", g: g.a1, note: "∂/∂a₁ = 1" });
+  steps.push({ node: "b", g: g.b, note: "∂/∂b = 1" });
+  const gd_m1 = g.a1 * 1, gd_m2 = g.a1 * 1;   // a1 = m1 + m2
+  g.m1 += gd_m1; g.m2 += gd_m2;
+  steps.push({ node: "m1", g: g.m1, note: "∂/∂m₁ = 1" });
+  steps.push({ node: "m2", g: g.m2, note: "∂/∂m₂ = 1" });
+  const gd_x1 = g.m1 * val.w1, gd_w1 = g.m1 * val.x1;    // m1 = x1·w1 (乘法: 交换局部导数)
+  const gd_x2 = g.m2 * val.w2, gd_w2 = g.m2 * val.x2;
+  g.x1 += gd_x1; g.w1 += gd_w1; g.x2 += gd_x2; g.w2 += gd_w2;
+  steps.push({ node: "x1", g: g.x1, note: `∂/∂x₁ = w₁ = ${val.w1.toFixed(2)}` });
+  steps.push({ node: "w1", g: g.w1, note: `∂/∂w₁ = x₁ = ${val.x1.toFixed(2)}` });
+  steps.push({ node: "x2", g: g.x2, note: `∂/∂x₂ = w₂ = ${val.w2.toFixed(2)}` });
+  steps.push({ node: "w2", g: g.w2, note: `∂/∂w₂ = x₂ = ${val.x2.toFixed(2)}` });
+  return steps;
+}
+
+let hl = null;
+function draw(msgNode) {
+  svg.innerHTML = "";
+  const defs = `<defs><marker id="arr" viewBox="0 0 10 10" refX="9" refY="5"
+    markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0L10,5L0,10z" fill="#9aa3b2"/></marker></defs>`;
+  svg.innerHTML = defs;
+  // 边
+  for (const [a, b2] of E.map(e => [e[0], e[1]])) {
+    const A = N[a], B = N[b2];
+    const l = document.createElementNS("http://www.w3.org/2000/svg", "line");
+    l.setAttribute("x1", A.x + 34); l.setAttribute("y1", A.y);
+    l.setAttribute("x2", B.x - 34); l.setAttribute("y2", B.y);
+    l.setAttribute("stroke", hl && hl.edge === a + "->" + b2 ? "#e8871a" : "#c4cbd8");
+    l.setAttribute("stroke-width", hl && hl.edge === a + "->" + b2 ? 3 : 1.4);
+    l.setAttribute("marker-end", "url(#arr)");
+    svg.append(l);
+  }
+  // 节点
+  for (const id in N) {
+    const n = N[id], isOp = n.t === "op";
+    const g = document.createElementNS("http://www.w3.org/2000/svg", "g");
+    const shape = isOp
+      ? `<rect x=${n.x - 26} y=${n.y - 22} width=52 height=44 rx=9
+           fill="${hl === id ? "#ffe3ba" : "#eaf1fb"}" stroke="${hl === id ? "#e8871a" : "#7fa8e8"}" stroke-width=2/>`
+      : n.t === "L"
+      ? `<circle cx=${n.x} cy=${n.y} r=27 fill="#fff3e0" stroke="#e8871a" stroke-width=2.5/>`
+      : `<circle cx=${n.x} cy=${n.y} r=25 fill="#e9f8ef" stroke="#3fbf7f" stroke-width=2/>`;
+    g.innerHTML = shape +
+      `<text x=${n.x} y=${n.y - (isOp ? 4 : 2)} text-anchor="middle" font-size="14"
+         fill="#1f2430" font-weight="600">${n.label}</text>` +
+      (val[id] !== null
+        ? `<text x=${n.x} y=${n.y + 13} text-anchor="middle" font-size="11"
+             fill="#6b7280" font-family="Menlo">${(+val[id]).toFixed(3)}</text>` : "") +
+      (gr[id] !== null
+        ? `<text x=${n.x} y=${n.y + 40} text-anchor="middle" font-size="11"
+             fill="#b91c1c" font-family="Menlo">∂L=${(+gr[id]).toFixed(3)}</text>` : "");
+    svg.append(g);
+  }
+  if (msgNode) {
+    const t = document.createElementNS("http://www.w3.org/2000/svg", "text");
+    t.setAttribute("x", 490); t.setAttribute("y", 30);
+    t.setAttribute("text-anchor", "middle"); t.setAttribute("font-size", "14");
+    t.setAttribute("fill", "#b45309");
+    t.textContent = msgNode;
+    svg.append(t);
+  }
+}
+function syncParams() {
+  ["x1","x2","w1","w2","b","y"].forEach(k => P[k] = parseFloat($("v" + k).value));
+  ["x1","x2","w1","w2","b","y"].forEach(k => $("l" + k.replace("yv","y")).textContent =
+    P[k === "yv" ? "y" : k].toFixed(2));
+}
+["x1","x2","w1","w2","b","y"].forEach(k => {
+  $("v" + k).addEventListener("input", () => {
+    syncParams(); reset();
+    $("l" + k).textContent = P[k].toFixed(2);
+  });
+});
+function reset() {
+  Object.keys(val).forEach(k => val[k] = null);
+  Object.keys(gr).forEach(k => gr[k] = null);
+  hl = null; draw("改了参数 → 请重新前向");
+  $("check").textContent = "先点「前向」，再点「反向」；然后点「梯度检查」——引擎梯度和有限差分应当一致到小数点后 6 位。";
+}
+function runForward() {
+  syncParams();
+  const order = ["x1","w1","x2","w2","b","yv","m1","m2","a1","a2","t","d","sq","L"];
+  let i = 0;
+  Object.keys(val).forEach(k => val[k] = null);
+  Object.keys(gr).forEach(k => gr[k] = null);
+  const iv = setInterval(() => {
+    const k = order[i];
+    forwardAll(); hl = k; draw(`前向: ${k} = ${(+val[k]).toFixed(4)}`);
+    if (++i >= order.length) {
+      clearInterval(iv);
+      draw(`前向完成: L = ${val.L.toFixed(4)} — 现在点「反向一遍」`);
+    }
+  }, 260);
+}
+function runBackward() {
+  if (val.L === null) { runForward(); setTimeout(runBackward, 14 * 260); return; }
+  const steps = backwardAll();
+  let i = 0;
+  const iv = setInterval(() => {
+    const s = steps[i];
+    gr[s.node] = s.g; hl = s.node;
+    draw(`反向: ∂L/∂${s.node} = ${s.g.toFixed(4)}   (${s.note})`);
+    if (++i >= steps.length) {
+      clearInterval(iv);
+      draw(`反向完成 — 红字就是每个节点的梯度。看看 w₁ 的梯度: 链式法则把输出误差一步步翻译回了每个参数。`);
+    }
+  }, 420);
+}
+function autoDemo() { reset(); runForward(); setTimeout(runBackward, 14 * 260 + 400); }
+function gradCheck() {
+  syncParams();
+  const lossAt = (dw) => {
+    const sav = P.w1; P.w1 = sav + dw;
+    const L = forwardAll();
+    P.w1 = sav; return L;
+  };
+  const eps = 1e-5;
+  const numeric = (lossAt(eps) - lossAt(-eps)) / (2 * eps);
+  forwardAll();
+  const steps = backwardAll();
+  const analytic = steps.find(s => s.node === "w1").g;
+  $("check").innerHTML =
+    `🔬 梯度检查 (对 w₁): 引擎 <b>${analytic.toFixed(6)}</b> · ` +
+    `数值 (中心差分) <b>${numeric.toFixed(6)}</b> · ` +
+    `误差 <b>${Math.abs(analytic - numeric).toExponential(1)}</b> ` +
+    `—— 第 04 课练习 1 的"标配保险"，此刻正在保护这个页面。`;
+}
+syncParams(); forwardAll(); draw("已就绪: 先「前向一遍」");
+</script>
+</body>
+</html>
